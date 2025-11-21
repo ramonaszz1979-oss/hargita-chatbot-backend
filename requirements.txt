@@ -3,3 +3,4 @@ google-genai
 flask-cors
 requests
 beautifulsoup4
+gunicorn
