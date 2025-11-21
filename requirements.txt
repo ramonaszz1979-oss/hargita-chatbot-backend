@@ -1,6 +1,11 @@
 Flask
-google-genai
 flask-cors
+gunicorn
 requests
 beautifulsoup4
-gunicorn
+# --- RAG Könyvtárak ---
+langchain
+langchain-google-genai 
+chromadb
+pypdf 
+unstructured
