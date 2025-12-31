@@ -16,7 +16,8 @@ Az alábbi lépések végigvezetnek azon, hogyan töltsd fel és aktiváld a PHP
 1. Aktiválás után a **Beállítások → Chatbot** menüben elérhetővé válik a bővítmény saját oldala.
 2. Itt megadhatod a chatbot címsorát, amely a widget tetején jelenik meg.
 3. Adj meg egy **OpenAI API-kulcsot** (pl. `sk-...`), hogy a chatbot valós AI válaszokat tudjon kérni a Chat Completions végponttól.
-4. Mentéshez kattints a **Módosítások mentése** gombra.
+4. Ha saját tudásanyagot szeretnél adni a chatbotnak, a **Tudásanyag feltöltése** résznél tölts fel egy TXT vagy MD fájlt. A feltöltött fájlok tartalma bekerül az AI kontextusába.
+5. Mentéshez kattints a **Módosítások mentése** gombra.
 
 ## 4) A chatbot elhelyezése az oldalon
 1. Nyisd meg azt az oldalt vagy bejegyzést, ahol meg szeretnéd jeleníteni a chatbotot.
