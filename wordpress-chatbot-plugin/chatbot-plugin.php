@@ -207,11 +207,11 @@ class SimpleChatbotPlugin
             </form>
 
             <h2><?php esc_html_e('Tudásanyag feltöltése', 'simple-chatbot'); ?></h2>
-            <p><?php esc_html_e('Tölts fel saját szöveges fájlt (TXT vagy MD), hogy az AI válaszoknál felhasználhassa.', 'simple-chatbot'); ?></p>
+            <p><?php esc_html_e('Tölts fel saját szöveges fájlt (TXT, MD vagy PDF), hogy az AI válaszoknál felhasználhassa.', 'simple-chatbot'); ?></p>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field('simple_chatbot_upload'); ?>
                 <input type="hidden" name="action" value="simple_chatbot_upload" />
-                <input type="file" name="simple_chatbot_file" accept=".txt,.md,text/plain,text/markdown" />
+                <input type="file" name="simple_chatbot_file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf" />
                 <?php submit_button(__('Feltöltés', 'simple-chatbot'), 'secondary', 'submit', false); ?>
             </form>
 
@@ -256,6 +256,7 @@ class SimpleChatbotPlugin
             'mimes' => [
                 'txt' => 'text/plain',
                 'md' => 'text/markdown',
+                'pdf' => 'application/pdf',
             ],
         ];
 
@@ -360,26 +361,32 @@ class SimpleChatbotPlugin
         foreach ($fileIds as $fileId) {
             $mime = get_post_mime_type($fileId);
 
-            if (!in_array($mime, ['text/plain', 'text/markdown'], true)) {
-                continue;
-            }
+            $contentFromFile = '';
 
             $filePath = get_attached_file($fileId);
 
             if ($filePath && file_exists($filePath)) {
-                $content .= "\n\n" . file_get_contents($filePath);
-                continue;
-            }
-
-            $url = wp_get_attachment_url($fileId);
-            if ($url) {
-                $response = wp_remote_get($url);
-                if (!is_wp_error($response)) {
-                    $body = wp_remote_retrieve_body($response);
-                    if (!empty($body)) {
-                        $content .= "\n\n" . $body;
+                $contentFromFile = $this->get_file_text($filePath, $mime);
+            } else {
+                $url = wp_get_attachment_url($fileId);
+                if ($url) {
+                    $response = wp_remote_get($url);
+                    if (!is_wp_error($response)) {
+                        $body = wp_remote_retrieve_body($response);
+                        if (!empty($body)) {
+                            $tmpFile = wp_tempnam($url);
+                            if ($tmpFile) {
+                                file_put_contents($tmpFile, $body);
+                                $contentFromFile = $this->get_file_text($tmpFile, $mime);
+                                @unlink($tmpFile);
+                            }
+                        }
                     }
                 }
+            }
+
+            if ($contentFromFile !== '') {
+                $content .= "\n\n" . $contentFromFile;
             }
         }
 
@@ -390,6 +397,101 @@ class SimpleChatbotPlugin
         }
 
         return __('Felhasználói tudásanyag:', 'simple-chatbot') . "\n" . mb_substr($trimmed, 0, 2000);
+    }
+
+    private function get_file_text(string $filePath, string $mime): string
+    {
+        if (in_array($mime, ['text/plain', 'text/markdown'], true)) {
+            $content = @file_get_contents($filePath);
+            return is_string($content) ? $content : '';
+        }
+
+        if ($mime === 'application/pdf') {
+            return $this->extract_pdf_text($filePath);
+        }
+
+        return '';
+    }
+
+    private function extract_pdf_text(string $filePath): string
+    {
+        $raw = @file_get_contents($filePath);
+
+        if ($raw === false || $raw === '') {
+            return '';
+        }
+
+        $text = $this->extract_pdf_text_from_streams($raw);
+
+        if ($text === '') {
+            $text = $this->extract_text_fragments($raw);
+        }
+
+        return trim(preg_replace('/\s+/', ' ', $text));
+    }
+
+    private function extract_pdf_text_from_streams(string $raw): string
+    {
+        $output = '';
+
+        if (preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $raw, $streams)) {
+            foreach ($streams[1] as $stream) {
+                $decoded = $this->try_inflate_stream($stream);
+                $output .= ' ' . $this->extract_text_fragments($decoded ?? $stream);
+            }
+        }
+
+        return trim($output);
+    }
+
+    private function try_inflate_stream(string $stream): ?string
+    {
+        $inflated = @gzuncompress($stream);
+
+        if ($inflated !== false) {
+            return $inflated;
+        }
+
+        $inflated = @gzinflate($stream);
+
+        if ($inflated !== false) {
+            return $inflated;
+        }
+
+        return null;
+    }
+
+    private function extract_text_fragments(string $content): string
+    {
+        $text = '';
+
+        if (preg_match_all('/\(([^\)\\]*(?:\\.[^\)\\]*)*)\)/s', $content, $matches)) {
+            foreach ($matches[1] as $fragment) {
+                $text .= ' ' . $this->decode_pdf_text_fragment($fragment);
+            }
+        }
+
+        if (preg_match_all('/<([0-9A-Fa-f]+)>/', $content, $hexMatches)) {
+            foreach ($hexMatches[1] as $hex) {
+                $decoded = @pack('H*', $hex);
+                if ($decoded !== false) {
+                    $text .= ' ' . $this->decode_pdf_text_fragment($decoded);
+                }
+            }
+        }
+
+        return trim($text);
+    }
+
+    private function decode_pdf_text_fragment(string $text): string
+    {
+        $decoded = str_replace(
+            ['\\(', '\\)', '\\\\', '\\n', '\\r', '\\t'],
+            ['(', ')', '\\', "\n", "\r", "\t"],
+            $text
+        );
+
+        return trim($decoded);
     }
 
     public function render_notices()
