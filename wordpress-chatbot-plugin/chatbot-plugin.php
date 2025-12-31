@@ -10,6 +10,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once plugin_dir_path(__FILE__) . 'includes/class-simple-chatbot-crawler.php';
+
 class SimpleChatbotPlugin
 {
     const VERSION = '1.0.0';
@@ -19,11 +21,16 @@ class SimpleChatbotPlugin
     const OPTION_KB_URLS = 'simple_chatbot_kb_urls';
     const OPTION_BEHAVIOR = 'simple_chatbot_behavior';
 
+    /** @var SimpleChatbotCrawler */
+    private $crawler;
+
     public function __construct()
     {
         add_shortcode('simple_chatbot', [$this, 'render_chatbot']);
         add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('rest_api_init', [$this, 'register_routes']);
+
+        $this->crawler = new SimpleChatbotCrawler();
     }
 
     public function enqueue_assets()
@@ -772,7 +779,7 @@ class SimpleChatbotPlugin
         $content = '';
 
         foreach ($urls as $url) {
-            $contentFromUrl = $this->collect_site_content($url);
+            $contentFromUrl = $this->crawler->collect_site_content($url);
 
             if ($contentFromUrl !== '') {
                 $content .= "\n\n" . $contentFromUrl;
@@ -902,135 +909,6 @@ class SimpleChatbotPlugin
         }
 
         return trim($text);
-    }
-
-    private function collect_site_content(string $rootUrl): string
-    {
-        $startUrl = wp_http_validate_url(esc_url_raw($rootUrl));
-
-        if (!$startUrl) {
-            return '';
-        }
-
-        $parsed = wp_parse_url($startUrl);
-
-        if (!$parsed || empty($parsed['host'])) {
-            return '';
-        }
-
-        $host = $parsed['host'];
-        $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
-        $scheme = isset($parsed['scheme']) ? $parsed['scheme'] : 'https';
-        $base = $scheme . '://' . $host . $port;
-
-        $queue = [$startUrl];
-        $visited = [];
-        $maxPages = 5;
-        $contentPieces = [];
-
-        while (!empty($queue) && count($visited) < $maxPages) {
-            $current = array_shift($queue);
-
-            if (isset($visited[$current])) {
-                continue;
-            }
-
-            $visited[$current] = true;
-
-            $response = wp_remote_get($current, ['timeout' => 10]);
-
-            if (is_wp_error($response)) {
-                continue;
-            }
-
-            $body = wp_remote_retrieve_body($response);
-
-            if (!is_string($body) || trim($body) === '') {
-                continue;
-            }
-
-            $contentPieces[] = wp_strip_all_tags($body);
-
-            if (count($visited) >= $maxPages) {
-                break;
-            }
-
-            $links = $this->extract_internal_links($body, $base, $host);
-
-            foreach ($links as $link) {
-                if (!isset($visited[$link]) && !in_array($link, $queue, true) && count($queue) + count($visited) < $maxPages) {
-                    $queue[] = $link;
-                }
-            }
-        }
-
-        return trim(implode("\n\n", $contentPieces));
-    }
-
-    private function extract_internal_links(string $html, string $base, string $host): array
-    {
-        $links = [];
-
-        libxml_use_internal_errors(true);
-        $dom = new DOMDocument();
-
-        if (!$dom->loadHTML($html)) {
-            libxml_clear_errors();
-            return $links;
-        }
-
-        libxml_clear_errors();
-        $anchors = $dom->getElementsByTagName('a');
-
-        foreach ($anchors as $anchor) {
-            /** @var DOMElement $anchor */
-            $href = $anchor->getAttribute('href');
-            $normalized = $this->normalize_url($href, $base);
-
-            if (!$normalized) {
-                continue;
-            }
-
-            $parsed = wp_parse_url($normalized);
-
-            if ($parsed && isset($parsed['host']) && $parsed['host'] === $host) {
-                $links[] = $normalized;
-            }
-        }
-
-        return array_values(array_unique($links));
-    }
-
-    private function normalize_url(string $href, string $base): ?string
-    {
-        $trimmed = trim($href);
-
-        if ($trimmed === '' || strpos($trimmed, 'javascript:') === 0 || strpos($trimmed, 'mailto:') === 0 || strpos($trimmed, '#') === 0) {
-            return null;
-        }
-
-        if (strpos($trimmed, '//') === 0) {
-            $trimmed = 'https:' . $trimmed;
-        }
-
-        $parsed = wp_parse_url($trimmed);
-
-        if ($parsed && !isset($parsed['scheme'])) {
-            $baseParsed = wp_parse_url($base);
-
-            if (!$baseParsed || empty($baseParsed['scheme']) || empty($baseParsed['host'])) {
-                return null;
-            }
-
-            $path = isset($trimmed[0]) && $trimmed[0] === '/'
-                ? $trimmed
-                : rtrim(isset($baseParsed['path']) ? $baseParsed['path'] : '/', '/') . '/' . ltrim($trimmed, '/');
-
-            $port = isset($baseParsed['port']) ? ':' . $baseParsed['port'] : '';
-            $trimmed = $baseParsed['scheme'] . '://' . $baseParsed['host'] . $port . $path;
-        }
-
-        return wp_http_validate_url($trimmed);
     }
 
     private function decode_pdf_text_fragment(string $text): string
