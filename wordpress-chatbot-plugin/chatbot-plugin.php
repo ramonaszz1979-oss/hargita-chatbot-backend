@@ -24,12 +24,6 @@ class SimpleChatbotPlugin
         add_shortcode('simple_chatbot', [$this, 'render_chatbot']);
         add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('rest_api_init', [$this, 'register_routes']);
-        add_action('admin_init', [$this, 'register_settings']);
-        add_action('admin_menu', [$this, 'register_settings_page']);
-        add_action('admin_post_simple_chatbot_upload', [$this, 'handle_file_upload']);
-        add_action('admin_post_simple_chatbot_delete_file', [$this, 'handle_file_delete']);
-        add_action('admin_post_simple_chatbot_add_url', [$this, 'handle_add_url']);
-        add_action('admin_post_simple_chatbot_delete_url', [$this, 'handle_delete_url']);
     }
 
     public function enqueue_assets()
@@ -53,6 +47,7 @@ class SimpleChatbotPlugin
             'apiBase' => esc_url_raw(rest_url('simple-chatbot/v1')),
             'nonce' => wp_create_nonce('wp_rest'),
             'title' => get_option(self::OPTION_KEY, __('Chatbot', 'simple-chatbot')),
+            'canManage' => current_user_can('manage_options'),
         ]);
     }
 
@@ -66,6 +61,77 @@ class SimpleChatbotPlugin
                 'message' => [
                     'required' => true,
                     'sanitize_callback' => 'sanitize_text_field',
+                ],
+            ],
+        ]);
+
+        register_rest_route('simple-chatbot/v1', '/settings', [
+            [
+                'methods' => 'GET',
+                'callback' => [$this, 'get_settings'],
+                'permission_callback' => [$this, 'can_manage'],
+            ],
+            [
+                'methods' => 'POST',
+                'callback' => [$this, 'save_settings'],
+                'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'title' => [
+                        'required' => true,
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                    'api_key' => [
+                        'required' => false,
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                    'behavior' => [
+                        'required' => true,
+                        'sanitize_callback' => 'sanitize_textarea_field',
+                    ],
+                ],
+            ],
+        ]);
+
+        register_rest_route('simple-chatbot/v1', '/knowledge/upload', [
+            'methods' => 'POST',
+            'callback' => [$this, 'handle_file_upload_rest'],
+            'permission_callback' => [$this, 'can_manage'],
+        ]);
+
+        register_rest_route('simple-chatbot/v1', '/knowledge/file/(?P<id>\d+)', [
+            'methods' => 'DELETE',
+            'callback' => [$this, 'handle_file_delete_rest'],
+            'permission_callback' => [$this, 'can_manage'],
+            'args' => [
+                'id' => [
+                    'validate_callback' => function ($param) {
+                        return intval($param) > 0;
+                    },
+                ],
+            ],
+        ]);
+
+        register_rest_route('simple-chatbot/v1', '/knowledge/url', [
+            [
+                'methods' => 'POST',
+                'callback' => [$this, 'handle_add_url_rest'],
+                'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'url' => [
+                        'required' => true,
+                        'sanitize_callback' => 'esc_url_raw',
+                    ],
+                ],
+            ],
+            [
+                'methods' => 'DELETE',
+                'callback' => [$this, 'handle_delete_url_rest'],
+                'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'url' => [
+                        'required' => true,
+                        'sanitize_callback' => 'esc_url_raw',
+                    ],
                 ],
             ],
         ]);
@@ -142,16 +208,233 @@ class SimpleChatbotPlugin
         ob_start();
         ?>
         <div class="simple-chatbot" data-title="<?php echo esc_attr($atts['title']); ?>">
-            <div class="simple-chatbot__header"><?php echo esc_html($atts['title']); ?></div>
-            <div class="simple-chatbot__messages" aria-live="polite"></div>
-            <form class="simple-chatbot__form">
-                <label class="screen-reader-text" for="simple-chatbot-input"><?php esc_html_e('Üzenet', 'simple-chatbot'); ?></label>
-                <input type="text" id="simple-chatbot-input" name="message" placeholder="<?php esc_attr_e('Írj üzenetet...', 'simple-chatbot'); ?>" required />
-                <button type="submit"><?php esc_html_e('Küldés', 'simple-chatbot'); ?></button>
-            </form>
+            <div class="simple-chatbot__actions">
+                <button class="simple-chatbot__button js-simple-chatbot-settings" <?php disabled(!current_user_can('manage_options')); ?>><?php esc_html_e('Beállítások', 'simple-chatbot'); ?></button>
+                <button class="simple-chatbot__button simple-chatbot__button--ghost js-simple-chatbot-preview"><?php esc_html_e('Preview', 'simple-chatbot'); ?></button>
+            </div>
+            <div class="simple-chatbot__panel simple-chatbot__panel--preview">
+                <div class="simple-chatbot__header"><?php echo esc_html($atts['title']); ?></div>
+                <div class="simple-chatbot__messages" aria-live="polite"></div>
+                <form class="simple-chatbot__form">
+                    <label class="screen-reader-text" for="simple-chatbot-input"><?php esc_html_e('Üzenet', 'simple-chatbot'); ?></label>
+                    <input type="text" id="simple-chatbot-input" name="message" placeholder="<?php esc_attr_e('Írj üzenetet...', 'simple-chatbot'); ?>" required />
+                    <button type="submit"><?php esc_html_e('Küldés', 'simple-chatbot'); ?></button>
+                </form>
+            </div>
+            <div class="simple-chatbot__modal" hidden>
+                <div class="simple-chatbot__modal-card">
+                    <div class="simple-chatbot__modal-header">
+                        <h2><?php esc_html_e('Chatbot beállítások', 'simple-chatbot'); ?></h2>
+                        <button class="simple-chatbot__close" type="button" aria-label="<?php esc_attr_e('Bezárás', 'simple-chatbot'); ?>">×</button>
+                    </div>
+                    <div class="simple-chatbot__modal-body">
+                        <form class="simple-chatbot__settings-form">
+                            <label>
+                                <span><?php esc_html_e('Chatbot címe', 'simple-chatbot'); ?></span>
+                                <input type="text" name="title" />
+                            </label>
+                            <label>
+                                <span><?php esc_html_e('OpenAI API-kulcs', 'simple-chatbot'); ?></span>
+                                <input type="password" name="api_key" autocomplete="off" />
+                            </label>
+                            <label>
+                                <span><?php esc_html_e('Chatbot viselkedés', 'simple-chatbot'); ?></span>
+                                <textarea name="behavior" rows="4"></textarea>
+                            </label>
+                            <div class="simple-chatbot__form-actions">
+                                <button type="submit" class="simple-chatbot__button simple-chatbot__button--primary"><?php esc_html_e('Mentés', 'simple-chatbot'); ?></button>
+                            </div>
+                        </form>
+
+                        <div class="simple-chatbot__section">
+                            <h3><?php esc_html_e('Tudásanyag fájlok', 'simple-chatbot'); ?></h3>
+                            <form class="simple-chatbot__upload-form">
+                                <input type="file" name="file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf" />
+                                <button type="submit" class="simple-chatbot__button"><?php esc_html_e('Feltöltés', 'simple-chatbot'); ?></button>
+                            </form>
+                            <ul class="simple-chatbot__list js-simple-chatbot-files"></ul>
+                        </div>
+
+                        <div class="simple-chatbot__section">
+                            <h3><?php esc_html_e('Tudásanyag weboldalak', 'simple-chatbot'); ?></h3>
+                            <form class="simple-chatbot__url-form">
+                                <input type="url" name="url" placeholder="https://pelda.hu" />
+                                <button type="submit" class="simple-chatbot__button"><?php esc_html_e('URL hozzáadása', 'simple-chatbot'); ?></button>
+                            </form>
+                            <ul class="simple-chatbot__list js-simple-chatbot-urls"></ul>
+                        </div>
+                        <div class="simple-chatbot__notice js-simple-chatbot-notice" hidden></div>
+                    </div>
+                </div>
+            </div>
         </div>
         <?php
         return ob_get_clean();
+    }
+
+    public function get_settings(): \WP_REST_Response
+    {
+        $files = $this->prepare_files();
+        $urls = get_option(self::OPTION_KB_URLS, []);
+
+        return rest_ensure_response([
+            'title' => get_option(self::OPTION_KEY, __('Chatbot', 'simple-chatbot')),
+            'api_key' => get_option(self::OPTION_API_KEY, ''),
+            'behavior' => get_option(self::OPTION_BEHAVIOR, __('Segítőkész asszisztens vagy, rövid, magyar nyelvű válaszokat adj.', 'simple-chatbot')),
+            'files' => $files,
+            'urls' => $urls,
+        ]);
+    }
+
+    public function save_settings(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $title = $request->get_param('title');
+        $apiKey = $request->get_param('api_key');
+        $behavior = $request->get_param('behavior');
+
+        update_option(self::OPTION_KEY, $title);
+        update_option(self::OPTION_API_KEY, $apiKey);
+        update_option(self::OPTION_BEHAVIOR, $behavior);
+
+        return rest_ensure_response(['success' => true]);
+    }
+
+    public function handle_file_upload_rest(\WP_REST_Request $request): \WP_REST_Response
+    {
+        if (empty($_FILES['file']['name'])) {
+            return new \WP_REST_Response(['message' => __('Nem választottál fájlt.', 'simple-chatbot')], 400);
+        }
+
+        $file = $_FILES['file'];
+
+        $overrides = [
+            'test_form' => false,
+            'mimes' => [
+                'txt' => 'text/plain',
+                'md' => 'text/markdown',
+                'pdf' => 'application/pdf',
+            ],
+        ];
+
+        $movefile = wp_handle_upload($file, $overrides);
+
+        if (isset($movefile['error'])) {
+            return new \WP_REST_Response(['message' => $movefile['error']], 400);
+        }
+
+        $filetype = wp_check_filetype_and_ext($movefile['file'], $movefile['url']);
+
+        if (empty($filetype['ext'])) {
+            @unlink($movefile['file']);
+            return new \WP_REST_Response(['message' => __('A fájl típusa nem támogatott.', 'simple-chatbot')], 400);
+        }
+
+        $attachment = [
+            'post_mime_type' => $filetype['type'],
+            'post_title' => sanitize_text_field(pathinfo($movefile['file'], PATHINFO_FILENAME)),
+            'post_content' => '',
+            'post_status' => 'inherit',
+        ];
+
+        $attachId = wp_insert_attachment($attachment, $movefile['file']);
+
+        if (is_wp_error($attachId)) {
+            @unlink($movefile['file']);
+            return new \WP_REST_Response(['message' => __('Nem sikerült a fájl mentése.', 'simple-chatbot')], 500);
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+        wp_update_attachment_metadata($attachId, wp_generate_attachment_metadata($attachId, $movefile['file']));
+
+        $existing = get_option(self::OPTION_KB_FILES, []);
+        $existing[] = $attachId;
+        update_option(self::OPTION_KB_FILES, $existing);
+
+        return rest_ensure_response([
+            'message' => __('Fájl sikeresen feltöltve.', 'simple-chatbot'),
+            'files' => $this->prepare_files(),
+        ]);
+    }
+
+    public function handle_file_delete_rest(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $fileId = intval($request->get_param('id'));
+
+        $files = get_option(self::OPTION_KB_FILES, []);
+        $files = array_filter($files, function ($id) use ($fileId) {
+            return intval($id) !== $fileId;
+        });
+
+        update_option(self::OPTION_KB_FILES, $files);
+        wp_delete_attachment($fileId, true);
+
+        return rest_ensure_response([
+            'message' => __('A fájl törölve.', 'simple-chatbot'),
+            'files' => $this->prepare_files(),
+        ]);
+    }
+
+    public function handle_add_url_rest(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $url = $request->get_param('url');
+        $validated = wp_http_validate_url($url);
+
+        if (!$validated) {
+            return new \WP_REST_Response(['message' => __('Érvénytelen URL.', 'simple-chatbot')], 400);
+        }
+
+        $existing = get_option(self::OPTION_KB_URLS, []);
+        $existing[] = $validated;
+        update_option(self::OPTION_KB_URLS, self::sanitize_kb_urls($existing));
+
+        return rest_ensure_response([
+            'message' => __('URL sikeresen hozzáadva.', 'simple-chatbot'),
+            'urls' => get_option(self::OPTION_KB_URLS, []),
+        ]);
+    }
+
+    public function handle_delete_url_rest(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $url = $request->get_param('url');
+
+        $urls = get_option(self::OPTION_KB_URLS, []);
+        $urls = array_filter($urls, function ($item) use ($url) {
+            return $item !== $url;
+        });
+
+        update_option(self::OPTION_KB_URLS, array_values($urls));
+
+        return rest_ensure_response([
+            'message' => __('Az URL törölve.', 'simple-chatbot'),
+            'urls' => get_option(self::OPTION_KB_URLS, []),
+        ]);
+    }
+
+    public function can_manage(): bool
+    {
+        return current_user_can('manage_options');
+    }
+
+    private function prepare_files(): array
+    {
+        $fileIds = get_option(self::OPTION_KB_FILES, []);
+        $files = [];
+
+        foreach ($fileIds as $fileId) {
+            $url = wp_get_attachment_url($fileId);
+            if (!$url) {
+                continue;
+            }
+
+            $files[] = [
+                'id' => $fileId,
+                'title' => get_the_title($fileId),
+                'url' => $url,
+                'mime' => get_post_mime_type($fileId),
+            ];
+        }
+
+        return $files;
     }
 
     public function register_settings()

@@ -12,19 +12,17 @@ Az alábbi lépések végigvezetnek azon, hogyan töltsd fel és aktiváld a PHP
 3. Kattints a **Bővítmény feltöltése** gombra, majd tallózd ki az előző lépésben készített ZIP fájlt.
 4. Nyomd meg a **Telepítés most** gombot, majd a telepítés után kattints az **Aktiválás** gombra.
 
-## 3) Beállítások
-1. Aktiválás után a **Beállítások → Chatbot** menüben elérhetővé válik a bővítmény saját oldala.
-2. Itt megadhatod a chatbot címsorát, amely a widget tetején jelenik meg.
-3. Adj meg egy **OpenAI API-kulcsot** (pl. `sk-...`), hogy a chatbot valós AI válaszokat tudjon kérni a Chat Completions végponttól.
-4. A **Chatbot viselkedés (rendszerutasítás)** mezőben szabhatod testre a hangnemet és a stílust (pl. formális, barátságos, rövid válaszok).
-5. Ha saját tudásanyagot szeretnél adni a chatbotnak, a **Tudásanyag feltöltése** résznél tölts fel egy TXT, MD vagy PDF fájlt. A feltöltött fájlok tartalma bekerül az AI kontextusába.
-6. Tudásanyagként weboldalakat is megadhatsz a **Tudásanyag weboldalak** űrlapon: illeszd be a kezdőoldal URL-jét (pl. `https://pelda.hu`). A bővítmény nemcsak a főoldal, hanem a kapcsolódó aloldalak szövegét is beolvassa, és beépíti a chatbot válaszaiba.
-7. Mentéshez kattints a **Módosítások mentése** gombra.
-
-## 4) A chatbot elhelyezése az oldalon
+## 3) A chatbot elhelyezése az oldalon
 1. Nyisd meg azt az oldalt vagy bejegyzést, ahol meg szeretnéd jeleníteni a chatbotot.
 2. Illeszd be a következő shortcode-ot a tartalomba: `[simple_chatbot]`.
-3. Mentés vagy frissítés után az oldalon megjelenik a chatbot felület.
+3. Mentés vagy frissítés után az oldalon megjelenik a chatbot felület a **Beállítások** és **Preview** gombokkal.
+
+## 4) Beállítások (vizuálisan, az oldalon)
+1. Nyisd meg az oldalt látogatói nézetben (admin jogosultsággal bejelentkezve). A chatbot felett kattints a **Beállítások** gombra.
+2. A megjelenő felületen add meg a chatbot címsorát, az **OpenAI API-kulcsot** (pl. `sk-...`) és a **chatbot viselkedését** (rendszerutasítás, pl. „barátságos, rövid válaszok”).
+3. A **Tudásanyag fájlok** résznél tölts fel TXT, MD vagy PDF fájlokat; tartalmuk bekerül az AI kontextusába.
+4. A **Tudásanyag weboldalak** űrlapon adj meg kezdőoldali URL-eket (pl. `https://pelda.hu`). A bővítmény a főoldal mellett a belső aloldalak szövegét is begyűjti és felhasználja a válaszokban.
+5. Mentés után a **Preview** gombbal azonnal kipróbálhatod, hogyan reagál a chatbot az új beállításokkal és tudásanyaggal.
 
 ## 5) Működés tesztelése
 1. Nyisd meg az oldalt látogatói nézetben.
