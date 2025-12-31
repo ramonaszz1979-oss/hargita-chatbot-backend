@@ -18,7 +18,8 @@ Az alábbi lépések végigvezetnek azon, hogyan töltsd fel és aktiváld a PHP
 3. Adj meg egy **OpenAI API-kulcsot** (pl. `sk-...`), hogy a chatbot valós AI válaszokat tudjon kérni a Chat Completions végponttól.
 4. A **Chatbot viselkedés (rendszerutasítás)** mezőben szabhatod testre a hangnemet és a stílust (pl. formális, barátságos, rövid válaszok).
 5. Ha saját tudásanyagot szeretnél adni a chatbotnak, a **Tudásanyag feltöltése** résznél tölts fel egy TXT, MD vagy PDF fájlt. A feltöltött fájlok tartalma bekerül az AI kontextusába.
-6. Mentéshez kattints a **Módosítások mentése** gombra.
+6. Tudásanyagként weboldalakat is megadhatsz a **Tudásanyag weboldalak** űrlapon: illeszd be a kezdőoldal URL-jét (pl. `https://pelda.hu`). A bővítmény nemcsak a főoldal, hanem a kapcsolódó aloldalak szövegét is beolvassa, és beépíti a chatbot válaszaiba.
+7. Mentéshez kattints a **Módosítások mentése** gombra.
 
 ## 4) A chatbot elhelyezése az oldalon
 1. Nyisd meg azt az oldalt vagy bejegyzést, ahol meg szeretnéd jeleníteni a chatbotot.

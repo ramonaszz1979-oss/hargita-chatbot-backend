@@ -16,6 +16,7 @@ class SimpleChatbotPlugin
     const OPTION_KEY = 'simple_chatbot_title';
     const OPTION_API_KEY = 'simple_chatbot_openai_api_key';
     const OPTION_KB_FILES = 'simple_chatbot_kb_files';
+    const OPTION_KB_URLS = 'simple_chatbot_kb_urls';
     const OPTION_BEHAVIOR = 'simple_chatbot_behavior';
 
     public function __construct()
@@ -27,6 +28,8 @@ class SimpleChatbotPlugin
         add_action('admin_menu', [$this, 'register_settings_page']);
         add_action('admin_post_simple_chatbot_upload', [$this, 'handle_file_upload']);
         add_action('admin_post_simple_chatbot_delete_file', [$this, 'handle_file_delete']);
+        add_action('admin_post_simple_chatbot_add_url', [$this, 'handle_add_url']);
+        add_action('admin_post_simple_chatbot_delete_url', [$this, 'handle_delete_url']);
     }
 
     public function enqueue_assets()
@@ -177,6 +180,12 @@ class SimpleChatbotPlugin
             'default' => [],
         ]);
 
+        register_setting('simple_chatbot_settings', self::OPTION_KB_URLS, [
+            'type' => 'array',
+            'sanitize_callback' => [self::class, 'sanitize_kb_urls'],
+            'default' => [],
+        ]);
+
         add_settings_section(
             'simple_chatbot_main_section',
             __('Chatbot beállítások', 'simple-chatbot'),
@@ -233,6 +242,17 @@ class SimpleChatbotPlugin
             </form>
 
             <?php $this->render_uploaded_files(); ?>
+
+            <h2><?php esc_html_e('Tudásanyag weboldalak', 'simple-chatbot'); ?></h2>
+            <p><?php esc_html_e('Adj meg webcímeket (URL), amelyek teljes oldalstruktúráját – a főoldalt és az aloldalakat – beemeljük a chatbot kontextusába.', 'simple-chatbot'); ?></p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('simple_chatbot_add_url'); ?>
+                <input type="hidden" name="action" value="simple_chatbot_add_url" />
+                <input type="url" name="simple_chatbot_url" class="regular-text" placeholder="https://pelda.hu" />
+                <?php submit_button(__('URL hozzáadása', 'simple-chatbot'), 'secondary', 'submit', false); ?>
+            </form>
+
+            <?php $this->render_urls(); ?>
         </div>
         <?php
     }
@@ -348,6 +368,53 @@ class SimpleChatbotPlugin
         $this->redirect_with_notice(__('A fájl törölve.', 'simple-chatbot'));
     }
 
+    public function handle_add_url()
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Nincs jogosultságod az URL hozzáadásához.', 'simple-chatbot'));
+        }
+
+        check_admin_referer('simple_chatbot_add_url');
+
+        $url = isset($_POST['simple_chatbot_url']) ? wp_unslash($_POST['simple_chatbot_url']) : '';
+        $validated = wp_http_validate_url(esc_url_raw($url));
+
+        if (!$validated) {
+            $this->redirect_with_notice(__('Érvénytelen URL.', 'simple-chatbot'), 'error');
+        }
+
+        $existing = get_option(self::OPTION_KB_URLS, []);
+        $existing[] = $validated;
+
+        update_option(self::OPTION_KB_URLS, self::sanitize_kb_urls($existing));
+
+        $this->redirect_with_notice(__('URL sikeresen hozzáadva.', 'simple-chatbot'));
+    }
+
+    public function handle_delete_url()
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Nincs jogosultságod az URL törléséhez.', 'simple-chatbot'));
+        }
+
+        $url = isset($_GET['simple_chatbot_url']) ? wp_unslash($_GET['simple_chatbot_url']) : '';
+
+        check_admin_referer('simple_chatbot_delete_url_' . md5($url));
+
+        if ($url === '') {
+            $this->redirect_with_notice(__('Hiányzó URL.', 'simple-chatbot'), 'error');
+        }
+
+        $urls = get_option(self::OPTION_KB_URLS, []);
+        $urls = array_filter($urls, function ($item) use ($url) {
+            return $item !== $url;
+        });
+
+        update_option(self::OPTION_KB_URLS, array_values($urls));
+
+        $this->redirect_with_notice(__('Az URL törölve.', 'simple-chatbot'));
+    }
+
     public function redirect_with_notice(string $message, string $type = 'updated')
     {
         $url = add_query_arg(
@@ -374,15 +441,42 @@ class SimpleChatbotPlugin
         }));
     }
 
+    public static function sanitize_kb_urls($value)
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $clean = [];
+
+        foreach ($value as $url) {
+            $validated = wp_http_validate_url(esc_url_raw($url));
+            if ($validated) {
+                $clean[] = $validated;
+            }
+        }
+
+        return array_values(array_unique($clean));
+    }
+
     private function get_knowledge_context(): string
     {
         $fileIds = get_option(self::OPTION_KB_FILES, []);
+        $urls = get_option(self::OPTION_KB_URLS, []);
 
-        if (empty($fileIds)) {
+        if (empty($fileIds) && empty($urls)) {
             return __('Nincs feltöltött tudásanyag.', 'simple-chatbot');
         }
 
         $content = '';
+
+        foreach ($urls as $url) {
+            $contentFromUrl = $this->collect_site_content($url);
+
+            if ($contentFromUrl !== '') {
+                $content .= "\n\n" . $contentFromUrl;
+            }
+        }
 
         foreach ($fileIds as $fileId) {
             $mime = get_post_mime_type($fileId);
@@ -509,6 +603,135 @@ class SimpleChatbotPlugin
         return trim($text);
     }
 
+    private function collect_site_content(string $rootUrl): string
+    {
+        $startUrl = wp_http_validate_url(esc_url_raw($rootUrl));
+
+        if (!$startUrl) {
+            return '';
+        }
+
+        $parsed = wp_parse_url($startUrl);
+
+        if (!$parsed || empty($parsed['host'])) {
+            return '';
+        }
+
+        $host = $parsed['host'];
+        $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+        $scheme = isset($parsed['scheme']) ? $parsed['scheme'] : 'https';
+        $base = $scheme . '://' . $host . $port;
+
+        $queue = [$startUrl];
+        $visited = [];
+        $maxPages = 5;
+        $contentPieces = [];
+
+        while (!empty($queue) && count($visited) < $maxPages) {
+            $current = array_shift($queue);
+
+            if (isset($visited[$current])) {
+                continue;
+            }
+
+            $visited[$current] = true;
+
+            $response = wp_remote_get($current, ['timeout' => 10]);
+
+            if (is_wp_error($response)) {
+                continue;
+            }
+
+            $body = wp_remote_retrieve_body($response);
+
+            if (!is_string($body) || trim($body) === '') {
+                continue;
+            }
+
+            $contentPieces[] = wp_strip_all_tags($body);
+
+            if (count($visited) >= $maxPages) {
+                break;
+            }
+
+            $links = $this->extract_internal_links($body, $base, $host);
+
+            foreach ($links as $link) {
+                if (!isset($visited[$link]) && !in_array($link, $queue, true) && count($queue) + count($visited) < $maxPages) {
+                    $queue[] = $link;
+                }
+            }
+        }
+
+        return trim(implode("\n\n", $contentPieces));
+    }
+
+    private function extract_internal_links(string $html, string $base, string $host): array
+    {
+        $links = [];
+
+        libxml_use_internal_errors(true);
+        $dom = new DOMDocument();
+
+        if (!$dom->loadHTML($html)) {
+            libxml_clear_errors();
+            return $links;
+        }
+
+        libxml_clear_errors();
+        $anchors = $dom->getElementsByTagName('a');
+
+        foreach ($anchors as $anchor) {
+            /** @var DOMElement $anchor */
+            $href = $anchor->getAttribute('href');
+            $normalized = $this->normalize_url($href, $base);
+
+            if (!$normalized) {
+                continue;
+            }
+
+            $parsed = wp_parse_url($normalized);
+
+            if ($parsed && isset($parsed['host']) && $parsed['host'] === $host) {
+                $links[] = $normalized;
+            }
+        }
+
+        return array_values(array_unique($links));
+    }
+
+    private function normalize_url(string $href, string $base): ?string
+    {
+        $trimmed = trim($href);
+
+        if ($trimmed === '' || strpos($trimmed, 'javascript:') === 0 || strpos($trimmed, 'mailto:') === 0 || strpos($trimmed, '#') === 0) {
+            return null;
+        }
+
+        if (strpos($trimmed, '//') === 0) {
+            $trimmed = 'https:' . $trimmed;
+        }
+
+        $parsed = wp_parse_url($trimmed);
+
+        if ($parsed && !isset($parsed['scheme'])) {
+            $baseParsed = wp_parse_url($base);
+
+            if (!$baseParsed || empty($baseParsed['scheme']) || empty($baseParsed['host'])) {
+                return null;
+            }
+
+            $path = isset($trimmed[0]) && $trimmed[0] === '/'
+                ? $trimmed
+                : rtrim(isset($baseParsed['path']) ? $baseParsed['path'] : '/', '/') . '/' . ltrim($trimmed, '/');
+
+            $port = isset($baseParsed['port']) ? ':' . $baseParsed['port'] : '';
+            $trimmed = $baseParsed['scheme'] . '://' . $baseParsed['host'] . $port . $path;
+        }
+
+        return wp_http_validate_url($trimmed);
+    }
+
     private function decode_pdf_text_fragment(string $text): string
     {
         $decoded = str_replace(
@@ -568,6 +791,39 @@ class SimpleChatbotPlugin
             echo '<li>';
             echo '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($title) . '</a> ';
             echo '<a href="' . esc_url($deleteUrl) . '" class="button-link delete">' . esc_html__('Törlés', 'simple-chatbot') . '</a>';
+            echo '</li>';
+        }
+
+        echo '</ul>';
+    }
+
+    public function render_urls()
+    {
+        $urls = get_option(self::OPTION_KB_URLS, []);
+
+        if (empty($urls)) {
+            echo '<p>' . esc_html__('Még nincs megadott webcím.', 'simple-chatbot') . '</p>';
+            return;
+        }
+
+        echo '<h3>' . esc_html__('Hozzáadott weboldalak', 'simple-chatbot') . '</h3>';
+        echo '<ul>';
+
+        foreach ($urls as $url) {
+            $deleteUrl = wp_nonce_url(
+                add_query_arg(
+                    [
+                        'action' => 'simple_chatbot_delete_url',
+                        'simple_chatbot_url' => rawurlencode($url),
+                    ],
+                    admin_url('admin-post.php')
+                ),
+                'simple_chatbot_delete_url_' . md5($url)
+            );
+
+            echo '<li>';
+            echo '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($url) . '</a> ';
+            echo '<a href="' . esc_url($deleteUrl) . '" class="button-link delete">' . esc_html__('Törlés', 'simple-chatbot') . "</a>";
             echo '</li>';
         }
 
