@@ -71,6 +71,35 @@ class SimpleChatbotCrawler
         return trim(implode("\n\n", $contentPieces));
     }
 
+    public function get_cached_or_collect(string $rootUrl, string $targetDir): string
+    {
+        if ($targetDir === '') {
+            return $this->collect_site_content($rootUrl);
+        }
+
+        if (!file_exists($targetDir) && !wp_mkdir_p($targetDir)) {
+            return $this->collect_site_content($rootUrl);
+        }
+
+        $cachePath = $this->build_cache_path($rootUrl, $targetDir);
+
+        if (file_exists($cachePath) && filesize($cachePath) > 0) {
+            $cached = @file_get_contents($cachePath);
+
+            if (is_string($cached) && trim($cached) !== '') {
+                return $cached;
+            }
+        }
+
+        $content = $this->collect_site_content($rootUrl);
+
+        if ($content !== '') {
+            @file_put_contents($cachePath, $content);
+        }
+
+        return $content;
+    }
+
     private function extract_internal_links(string $html, string $base, string $host): array
     {
         $links = [];
@@ -142,5 +171,11 @@ class SimpleChatbotCrawler
         }
 
         return wp_http_validate_url($trimmed);
+    }
+
+    private function build_cache_path(string $rootUrl, string $targetDir): string
+    {
+        $hash = md5($rootUrl);
+        return trailingslashit($targetDir) . 'kb_url_' . $hash . '.txt';
     }
 }

@@ -21,7 +21,7 @@ Az alábbi lépések végigvezetnek azon, hogyan töltsd fel és aktiváld a PHP
 1. Nyisd meg az oldalt látogatói nézetben (admin jogosultsággal bejelentkezve). A chatbot felett kattints a **Beállítások** gombra.
 2. A megjelenő felületen add meg a chatbot címsorát, az **OpenAI API-kulcsot** (pl. `sk-...`) és a **chatbot viselkedését** (rendszerutasítás, pl. „barátságos, rövid válaszok”).
 3. A **Tudásanyag fájlok** résznél tölts fel TXT, MD vagy PDF fájlokat; tartalmuk bekerül az AI kontextusába.
-4. A **Tudásanyag weboldalak** űrlapon adj meg kezdőoldali URL-eket (pl. `https://pelda.hu`). A bővítmény a főoldal mellett a belső aloldalak szövegét is begyűjti és felhasználja a válaszokban.
+4. A **Tudásanyag weboldalak** űrlapon adj meg kezdőoldali URL-eket (pl. `https://pelda.hu`). A bővítmény a főoldal mellett a belső aloldalak szövegét is begyűjti, `.txt` fájlokba menti a WordPress feltöltések mappájában (`wp-content/uploads/simple-chatbot/url-cache`), és ezekből tölti be a tudásanyagot az AI-nak.
 5. Mentés után a **Preview** gombbal azonnal kipróbálhatod, hogyan reagál a chatbot az új beállításokkal és tudásanyaggal.
 
 ## 5) Működés tesztelése

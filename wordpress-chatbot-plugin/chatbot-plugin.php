@@ -33,6 +33,17 @@ class SimpleChatbotPlugin
         $this->crawler = new SimpleChatbotCrawler();
     }
 
+    private function get_url_cache_dir(): string
+    {
+        $upload = wp_upload_dir();
+
+        if (!isset($upload['basedir']) || $upload['basedir'] === '') {
+            return '';
+        }
+
+        return trailingslashit($upload['basedir']) . 'simple-chatbot/url-cache';
+    }
+
     public function enqueue_assets()
     {
         wp_enqueue_style(
@@ -777,9 +788,10 @@ class SimpleChatbotPlugin
         }
 
         $content = '';
+        $cacheDir = $this->get_url_cache_dir();
 
         foreach ($urls as $url) {
-            $contentFromUrl = $this->crawler->collect_site_content($url);
+            $contentFromUrl = $this->crawler->get_cached_or_collect($url, $cacheDir);
 
             if ($contentFromUrl !== '') {
                 $content .= "\n\n" . $contentFromUrl;
