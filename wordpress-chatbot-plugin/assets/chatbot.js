@@ -263,6 +263,20 @@
       });
     }
 
+    if (modal) {
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+          toggleModal(false);
+        }
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+          toggleModal(false);
+        }
+      });
+    }
+
     if (settingsForm) {
       settingsForm.addEventListener('submit', function (event) {
         event.preventDefault();
