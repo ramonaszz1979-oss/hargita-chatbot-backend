@@ -77,7 +77,7 @@ class SimpleChatbotPlugin
                 'permission_callback' => [$this, 'can_manage'],
                 'args' => [
                     'title' => [
-                        'required' => true,
+                        'required' => false,
                         'sanitize_callback' => 'sanitize_text_field',
                     ],
                     'api_key' => [
@@ -85,7 +85,7 @@ class SimpleChatbotPlugin
                         'sanitize_callback' => 'sanitize_text_field',
                     ],
                     'behavior' => [
-                        'required' => true,
+                        'required' => false,
                         'sanitize_callback' => 'sanitize_textarea_field',
                     ],
                 ],
@@ -292,11 +292,29 @@ class SimpleChatbotPlugin
         $apiKey = $request->get_param('api_key');
         $behavior = $request->get_param('behavior');
 
-        update_option(self::OPTION_KEY, $title);
-        update_option(self::OPTION_API_KEY, $apiKey);
-        update_option(self::OPTION_BEHAVIOR, $behavior);
+        $currentTitle = get_option(self::OPTION_KEY, __('Chatbot', 'simple-chatbot'));
+        $currentApiKey = get_option(self::OPTION_API_KEY, '');
+        $currentBehavior = get_option(
+            self::OPTION_BEHAVIOR,
+            __('Segítőkész asszisztens vagy, rövid, magyar nyelvű válaszokat adj.', 'simple-chatbot')
+        );
 
-        return rest_ensure_response(['success' => true]);
+        $titleToSave = is_null($title) ? $currentTitle : sanitize_text_field($title);
+        $apiKeyToSave = is_null($apiKey) ? $currentApiKey : sanitize_text_field($apiKey);
+        $behaviorToSave = is_null($behavior) ? $currentBehavior : sanitize_textarea_field($behavior);
+
+        update_option(self::OPTION_KEY, $titleToSave);
+        update_option(self::OPTION_API_KEY, $apiKeyToSave);
+        update_option(self::OPTION_BEHAVIOR, $behaviorToSave);
+
+        return rest_ensure_response([
+            'success' => true,
+            'title' => $titleToSave,
+            'api_key' => $apiKeyToSave,
+            'behavior' => $behaviorToSave,
+            'files' => $this->prepare_files(),
+            'urls' => get_option(self::OPTION_KB_URLS, []),
+        ]);
     }
 
     public function handle_file_upload_rest(\WP_REST_Request $request): \WP_REST_Response

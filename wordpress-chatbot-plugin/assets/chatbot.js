@@ -292,7 +292,16 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-          .then(function () {
+          .then(function (data) {
+            if (data) {
+              fillSettings({
+                title: data.title,
+                api_key: data.api_key,
+                behavior: data.behavior,
+                files: data.files,
+                urls: data.urls,
+              });
+            }
             setNotice('Beállítások elmentve.', 'success');
           })
           .catch(function () {
