@@ -30,3 +30,4 @@ Az alábbi lépések végigvezetnek azon, hogyan töltsd fel és aktiváld a PHP
 ## Tippek
 - Ha a megjelenést szeretnéd módosítani, szerkeszd a `assets/chatbot.css` fájlt.
 - A válaszlogika a `chatbot-plugin.php` `generate_response()` függvényében található. Itt alakíthatod ki a saját üzleti logikádat vagy összekötheted külső API-kkal.
+- A beépített egyszerű AI szabályalapú: felismeri az alapvető köszönéseket és kulcsszavakat (pl. nyitvatartás, árak, segítség), és ezekre rögtön választ ad.

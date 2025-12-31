@@ -81,15 +81,45 @@ class SimpleChatbotPlugin
             return __('Kérlek, írj be egy üzenetet!', 'simple-chatbot');
         }
 
-        $templates = [
-            __('Ezt mondtad: "%s". Hogyan segíthetek még?', 'simple-chatbot'),
-            __('Érdekes! "%s" témában tudok még információt adni, ha szeretnéd.', 'simple-chatbot'),
-            __('Köszönöm az üzeneted: "%s". Van még kérdésed?', 'simple-chatbot'),
+        $normalized = mb_strtolower($sanitized, 'UTF-8');
+
+        $greetings = ['szia', 'helló', 'üdv', 'hello', 'hi', 'hey'];
+        foreach ($greetings as $greeting) {
+            if (strpos($normalized, $greeting) !== false) {
+                return __('Szia! Egy egyszerű AI válaszoló vagyok. Mire vagy kíváncsi?', 'simple-chatbot');
+            }
+        }
+
+        $faq = [
+            'nyitvatart' => __('A nyitvatartásról nincs konkrét adat a rendszerben, de általában 9-17 óra között vagyunk elérhetők online.', 'simple-chatbot'),
+            'arak' => __('Árakról itt nem található információ, de szívesen segítek általános kérdésekben vagy tájékoztatásban.', 'simple-chatbot'),
+            'kapcsolat' => __('Kapcsolati adatokat nem tárolok, de érdemes az oldal Kapcsolat menüpontját megnézni.', 'simple-chatbot'),
+            'segíts' => __('Szívesen segítek! Írd le röviden a kérdésed vagy a problémád, és adok egy rövid választ.', 'simple-chatbot'),
+            'help' => __('Szívesen segítek! Írd le röviden a kérdésed vagy a problémád, és adok egy rövid választ.', 'simple-chatbot'),
+            'info' => __('Általános tájékoztatást tudok adni. Mondd el, miben kellene információ!', 'simple-chatbot'),
+            'köszön' => __('Szívesen, ha van még kérdésed, nyugodtan írd meg!', 'simple-chatbot'),
+            'koszon' => __('Szívesen, ha van még kérdésed, nyugodtan írd meg!', 'simple-chatbot'),
+            'időjárás' => __('Időjárási adatokat nem tudok lekérni, de nézd meg a kedvenc időjárás appodban!', 'simple-chatbot'),
+            'idojaras' => __('Időjárási adatokat nem tudok lekérni, de nézd meg a kedvenc időjárás appodban!', 'simple-chatbot'),
         ];
 
-        $template = $templates[array_rand($templates)];
+        foreach ($faq as $keyword => $answer) {
+            if (strpos($normalized, $keyword) !== false) {
+                return $answer;
+            }
+        }
 
-        return sprintf($template, esc_html($sanitized));
+        if (substr($normalized, -1) === '?') {
+            return sprintf(
+                __('Jó kérdés: "%s". Röviden válaszolva: jelenlegi tudásom alapján általános tanácsot tudok adni, de pontos adatokért érdemes az oldal információit megnézni.', 'simple-chatbot'),
+                esc_html($sanitized)
+            );
+        }
+
+        return sprintf(
+            __('Értem: "%s". Írj egy kérdést, és igyekszem hasznos választ adni!', 'simple-chatbot'),
+            esc_html($sanitized)
+        );
     }
 
     public function render_chatbot($atts)
