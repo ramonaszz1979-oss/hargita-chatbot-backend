@@ -16,6 +16,7 @@ class SimpleChatbotPlugin
     const OPTION_KEY = 'simple_chatbot_title';
     const OPTION_API_KEY = 'simple_chatbot_openai_api_key';
     const OPTION_KB_FILES = 'simple_chatbot_kb_files';
+    const OPTION_BEHAVIOR = 'simple_chatbot_behavior';
 
     public function __construct()
     {
@@ -91,12 +92,14 @@ class SimpleChatbotPlugin
             return __('Nincs megadva OpenAI API-kulcs. Kérd meg az adminisztrátort, hogy a Beállítások → Chatbot oldalon adja meg az API-kulcsot.', 'simple-chatbot');
         }
 
+        $behavior = trim(get_option(self::OPTION_BEHAVIOR, __('Segítőkész asszisztens vagy, rövid, magyar nyelvű válaszokat adj.', 'simple-chatbot')));
+
         $kbText = $this->get_knowledge_context();
 
         $requestBody = json_encode([
             'model' => 'gpt-4o-mini',
             'messages' => [
-                ['role' => 'system', 'content' => __('Segítőkész asszisztens vagy, rövid, magyar nyelvű válaszokat adj.', 'simple-chatbot')],
+                ['role' => 'system', 'content' => $behavior],
                 ['role' => 'system', 'content' => $kbText],
                 ['role' => 'user', 'content' => $sanitized],
             ],
@@ -162,6 +165,12 @@ class SimpleChatbotPlugin
             'default' => '',
         ]);
 
+        register_setting('simple_chatbot_settings', self::OPTION_BEHAVIOR, [
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_textarea_field',
+            'default' => __('Segítőkész asszisztens vagy, rövid, magyar nyelvű válaszokat adj.', 'simple-chatbot'),
+        ]);
+
         register_setting('simple_chatbot_settings', self::OPTION_KB_FILES, [
             'type' => 'array',
             'sanitize_callback' => [self::class, 'sanitize_kb_files'],
@@ -187,6 +196,14 @@ class SimpleChatbotPlugin
             self::OPTION_API_KEY,
             __('OpenAI API-kulcs', 'simple-chatbot'),
             [$this, 'render_api_key_field'],
+            'simple_chatbot_settings',
+            'simple_chatbot_main_section'
+        );
+
+        add_settings_field(
+            self::OPTION_BEHAVIOR,
+            __('Chatbot viselkedés (rendszerutasítás)', 'simple-chatbot'),
+            [$this, 'render_behavior_field'],
             'simple_chatbot_settings',
             'simple_chatbot_main_section'
         );
@@ -234,6 +251,15 @@ class SimpleChatbotPlugin
         ?>
         <input type="password" name="<?php echo esc_attr(self::OPTION_API_KEY); ?>" value="<?php echo esc_attr($value); ?>" class="regular-text" autocomplete="off" />
         <p class="description"><?php esc_html_e('Add meg az OpenAI API-kulcsot (pl. sk-...). A kulcs nem jelenik meg nyilvánosan, de a WordPress adatbázisban tárolódik.', 'simple-chatbot'); ?></p>
+        <?php
+    }
+
+    public function render_behavior_field()
+    {
+        $value = get_option(self::OPTION_BEHAVIOR, __('Segítőkész asszisztens vagy, rövid, magyar nyelvű válaszokat adj.', 'simple-chatbot'));
+        ?>
+        <textarea name="<?php echo esc_attr(self::OPTION_BEHAVIOR); ?>" rows="4" class="large-text code"><?php echo esc_textarea($value); ?></textarea>
+        <p class="description"><?php esc_html_e('Add meg a rendszerutasítást, amely meghatározza a chatbot viselkedését (pl. hangnem, válaszstílus).', 'simple-chatbot'); ?></p>
         <?php
     }
 
