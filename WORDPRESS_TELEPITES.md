@@ -15,7 +15,8 @@ Az alábbi lépések végigvezetnek azon, hogyan töltsd fel és aktiváld a PHP
 ## 3) Beállítások
 1. Aktiválás után a **Beállítások → Chatbot** menüben elérhetővé válik a bővítmény saját oldala.
 2. Itt megadhatod a chatbot címsorát, amely a widget tetején jelenik meg.
-3. Mentéshez kattints a **Módosítások mentése** gombra.
+3. Adj meg egy **OpenAI API-kulcsot** (pl. `sk-...`), hogy a chatbot valós AI válaszokat tudjon kérni a Chat Completions végponttól.
+4. Mentéshez kattints a **Módosítások mentése** gombra.
 
 ## 4) A chatbot elhelyezése az oldalon
 1. Nyisd meg azt az oldalt vagy bejegyzést, ahol meg szeretnéd jeleníteni a chatbotot.
@@ -25,9 +26,8 @@ Az alábbi lépések végigvezetnek azon, hogyan töltsd fel és aktiváld a PHP
 ## 5) Működés tesztelése
 1. Nyisd meg az oldalt látogatói nézetben.
 2. Írj egy üzenetet az input mezőbe, majd kattints a **Küldés** gombra.
-3. A chatbot a megadott REST végponton keresztül ad választ, és megjeleníti azt az üzenetlista alatt.
+3. Ha be van állítva az OpenAI API-kulcs, a chatbot az OpenAI Chat Completions API-n keresztül kéri le a választ, és megjeleníti azt az üzenetlista alatt.
 
 ## Tippek
 - Ha a megjelenést szeretnéd módosítani, szerkeszd a `assets/chatbot.css` fájlt.
-- A válaszlogika a `chatbot-plugin.php` `generate_response()` függvényében található. Itt alakíthatod ki a saját üzleti logikádat vagy összekötheted külső API-kkal.
-- A beépített egyszerű AI szabályalapú: felismeri az alapvető köszönéseket és kulcsszavakat (pl. nyitvatartás, árak, segítség), és ezekre rögtön választ ad.
+- A válaszlogika a `chatbot-plugin.php` `generate_response()` függvényében található, amely az OpenAI Chat Completions végpontot hívja meg a beállított API-kulccsal.

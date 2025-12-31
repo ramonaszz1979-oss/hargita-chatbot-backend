@@ -14,6 +14,7 @@ class SimpleChatbotPlugin
 {
     const VERSION = '1.0.0';
     const OPTION_KEY = 'simple_chatbot_title';
+    const OPTION_API_KEY = 'simple_chatbot_openai_api_key';
 
     public function __construct()
     {
@@ -81,45 +82,43 @@ class SimpleChatbotPlugin
             return __('Kérlek, írj be egy üzenetet!', 'simple-chatbot');
         }
 
-        $normalized = mb_strtolower($sanitized, 'UTF-8');
+        $apiKey = trim(get_option(self::OPTION_API_KEY, ''));
 
-        $greetings = ['szia', 'helló', 'üdv', 'hello', 'hi', 'hey'];
-        foreach ($greetings as $greeting) {
-            if (strpos($normalized, $greeting) !== false) {
-                return __('Szia! Egy egyszerű AI válaszoló vagyok. Mire vagy kíváncsi?', 'simple-chatbot');
-            }
+        if ($apiKey === '') {
+            return __('Nincs megadva OpenAI API-kulcs. Kérd meg az adminisztrátort, hogy a Beállítások → Chatbot oldalon adja meg az API-kulcsot.', 'simple-chatbot');
         }
 
-        $faq = [
-            'nyitvatart' => __('A nyitvatartásról nincs konkrét adat a rendszerben, de általában 9-17 óra között vagyunk elérhetők online.', 'simple-chatbot'),
-            'arak' => __('Árakról itt nem található információ, de szívesen segítek általános kérdésekben vagy tájékoztatásban.', 'simple-chatbot'),
-            'kapcsolat' => __('Kapcsolati adatokat nem tárolok, de érdemes az oldal Kapcsolat menüpontját megnézni.', 'simple-chatbot'),
-            'segíts' => __('Szívesen segítek! Írd le röviden a kérdésed vagy a problémád, és adok egy rövid választ.', 'simple-chatbot'),
-            'help' => __('Szívesen segítek! Írd le röviden a kérdésed vagy a problémád, és adok egy rövid választ.', 'simple-chatbot'),
-            'info' => __('Általános tájékoztatást tudok adni. Mondd el, miben kellene információ!', 'simple-chatbot'),
-            'köszön' => __('Szívesen, ha van még kérdésed, nyugodtan írd meg!', 'simple-chatbot'),
-            'koszon' => __('Szívesen, ha van még kérdésed, nyugodtan írd meg!', 'simple-chatbot'),
-            'időjárás' => __('Időjárási adatokat nem tudok lekérni, de nézd meg a kedvenc időjárás appodban!', 'simple-chatbot'),
-            'idojaras' => __('Időjárási adatokat nem tudok lekérni, de nézd meg a kedvenc időjárás appodban!', 'simple-chatbot'),
-        ];
+        $requestBody = json_encode([
+            'model' => 'gpt-4o-mini',
+            'messages' => [
+                ['role' => 'system', 'content' => __('Segítőkész asszisztens vagy, rövid, magyar nyelvű válaszokat adj.', 'simple-chatbot')],
+                ['role' => 'user', 'content' => $sanitized],
+            ],
+            'max_tokens' => 256,
+            'temperature' => 0.7,
+        ]);
 
-        foreach ($faq as $keyword => $answer) {
-            if (strpos($normalized, $keyword) !== false) {
-                return $answer;
-            }
+        $response = wp_remote_post('https://api.openai.com/v1/chat/completions', [
+            'timeout' => 20,
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $apiKey,
+            ],
+            'body' => $requestBody,
+        ]);
+
+        if (is_wp_error($response)) {
+            return __('Hiba történt a válasz lekérdezése közben. Próbáld újra később.', 'simple-chatbot');
         }
 
-        if (substr($normalized, -1) === '?') {
-            return sprintf(
-                __('Jó kérdés: "%s". Röviden válaszolva: jelenlegi tudásom alapján általános tanácsot tudok adni, de pontos adatokért érdemes az oldal információit megnézni.', 'simple-chatbot'),
-                esc_html($sanitized)
-            );
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($code !== 200 || empty($body['choices'][0]['message']['content'])) {
+            return __('Nem sikerült AI választ kapni. Kérlek, próbáld meg újra.', 'simple-chatbot');
         }
 
-        return sprintf(
-            __('Értem: "%s". Írj egy kérdést, és igyekszem hasznos választ adni!', 'simple-chatbot'),
-            esc_html($sanitized)
-        );
+        return wp_kses_post(trim($body['choices'][0]['message']['content']));
     }
 
     public function render_chatbot($atts)
@@ -151,6 +150,12 @@ class SimpleChatbotPlugin
             'default' => __('Chatbot', 'simple-chatbot'),
         ]);
 
+        register_setting('simple_chatbot_settings', self::OPTION_API_KEY, [
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => '',
+        ]);
+
         add_settings_section(
             'simple_chatbot_main_section',
             __('Chatbot beállítások', 'simple-chatbot'),
@@ -162,6 +167,14 @@ class SimpleChatbotPlugin
             self::OPTION_KEY,
             __('Chatbot címe', 'simple-chatbot'),
             [$this, 'render_title_field'],
+            'simple_chatbot_settings',
+            'simple_chatbot_main_section'
+        );
+
+        add_settings_field(
+            self::OPTION_API_KEY,
+            __('OpenAI API-kulcs', 'simple-chatbot'),
+            [$this, 'render_api_key_field'],
             'simple_chatbot_settings',
             'simple_chatbot_main_section'
         );
@@ -188,6 +201,15 @@ class SimpleChatbotPlugin
         $value = get_option(self::OPTION_KEY, __('Chatbot', 'simple-chatbot'));
         ?>
         <input type="text" name="<?php echo esc_attr(self::OPTION_KEY); ?>" value="<?php echo esc_attr($value); ?>" class="regular-text" />
+        <?php
+    }
+
+    public function render_api_key_field()
+    {
+        $value = get_option(self::OPTION_API_KEY, '');
+        ?>
+        <input type="password" name="<?php echo esc_attr(self::OPTION_API_KEY); ?>" value="<?php echo esc_attr($value); ?>" class="regular-text" autocomplete="off" />
+        <p class="description"><?php esc_html_e('Add meg az OpenAI API-kulcsot (pl. sk-...). A kulcs nem jelenik meg nyilvánosan, de a WordPress adatbázisban tárolódik.', 'simple-chatbot'); ?></p>
         <?php
     }
 
