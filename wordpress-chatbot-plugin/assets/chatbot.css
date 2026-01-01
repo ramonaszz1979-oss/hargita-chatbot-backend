@@ -301,6 +301,35 @@
   margin: 0 0 8px;
 }
 
+.simple-chatbot__dissertation {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fbfbfb;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+}
+
+.simple-chatbot__dissertation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.simple-chatbot__dissertation-panel {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.simple-chatbot__pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .simple-chatbot__upload-form,
 .simple-chatbot__url-form {
   display: flex;
@@ -367,6 +396,16 @@
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 14px;
+}
+
+.simple-chatbot__dissertation-question {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
 }
 
 .simple-chatbot__icon-button {

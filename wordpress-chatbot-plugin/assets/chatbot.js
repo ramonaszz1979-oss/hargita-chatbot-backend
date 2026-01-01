@@ -239,6 +239,10 @@
     const embedPanel = root.querySelector('.js-simple-chatbot-embed-panel');
     const embedCodeField = root.querySelector('.js-simple-chatbot-embed-code');
     const embedCopyBtn = root.querySelector('.js-simple-chatbot-copy-embed');
+    const dissertationToggle = root.querySelector('.js-simple-chatbot-dissertation-toggle');
+    const dissertationPanel = root.querySelector('.js-simple-chatbot-dissertation-panel');
+    const dissertationOptions = root.querySelectorAll('.js-simple-chatbot-dissertation-option');
+    const dissertationQuestion = root.querySelector('.js-simple-chatbot-dissertation-question');
 
     let processSections = [];
     let activeProcessSectionId = null;
@@ -323,6 +327,48 @@
       } else {
         fallbackCopy(snippet);
       }
+    }
+
+    function toggleDissertationPanel() {
+      if (!dissertationPanel) {
+        return;
+      }
+
+      const willShow = dissertationPanel.hidden;
+      dissertationPanel.hidden = !willShow;
+
+      if (willShow && dissertationQuestion) {
+        dissertationQuestion.focus();
+      }
+    }
+
+    function buildDissertationPrompt(topic) {
+      const extra = dissertationQuestion ? dissertationQuestion.value.trim() : '';
+      const lines = [
+        `Készíts részletes, reális disszertációs dolgozat segédletet a következő témában: ${topic}.`,
+        'Adj magyar nyelvű vázlatot fejezetcímekkel, kutatási kérdéseket, módszertani javaslatot, adatforrás ötleteket, ütemtervet és értékelési szempontokat.',
+        'A segédlet legyen strukturált, pontokba szedett és hivatkozásra kész.',
+      ];
+
+      if (extra) {
+        lines.push(`Kiegészítő kérés/kérdés: ${extra}`);
+      }
+
+      return lines.join('\n');
+    }
+
+    function sendDissertationPrompt(topic) {
+      if (!topic) {
+        return;
+      }
+
+      const prompt = buildDissertationPrompt(topic);
+      setNotice(`Disszertációs segédlet készül: ${topic}`, 'info');
+      if (dissertationQuestion) {
+        dissertationQuestion.value = '';
+      }
+      toggleModal(false);
+      sendMessage(prompt);
     }
 
     function ensureActiveSection(sections) {
@@ -1137,6 +1183,22 @@
       embedCopyBtn.addEventListener('click', function () {
         hydrateEmbedCode();
         copyEmbedSnippet();
+      });
+    }
+
+    if (dissertationToggle && dissertationPanel) {
+      dissertationToggle.addEventListener('click', function () {
+        toggleDissertationPanel();
+        dissertationToggle.setAttribute('aria-expanded', dissertationPanel.hidden ? 'false' : 'true');
+      });
+    }
+
+    if (dissertationOptions && dissertationOptions.length) {
+      dissertationOptions.forEach(function (button) {
+        button.addEventListener('click', function () {
+          const topic = button.dataset.topic || button.textContent || '';
+          sendDissertationPrompt(topic);
+        });
       });
     }
 
