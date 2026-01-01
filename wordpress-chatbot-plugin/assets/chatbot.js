@@ -297,6 +297,16 @@
       }
     }
 
+    function lockSettingsFormForViewers() {
+      if (!settingsForm || canManage) {
+        return;
+      }
+
+      settingsForm.querySelectorAll('input, textarea, button, select').forEach(function (el) {
+        el.setAttribute('disabled', 'disabled');
+      });
+    }
+
     function setNotice(text, type) {
       if (!noticeEl) {
         return;
@@ -1314,7 +1324,9 @@
     if (settingsBtn) {
       settingsBtn.addEventListener('click', function () {
         if (!canManage) {
+          toggleModal(true);
           setNotice('Nincs jogosultságod a beállítások módosításához.', 'error');
+          lockSettingsFormForViewers();
           return;
         }
         toggleModal(true);
