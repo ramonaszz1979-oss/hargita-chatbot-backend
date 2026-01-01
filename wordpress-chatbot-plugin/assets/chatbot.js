@@ -260,11 +260,16 @@
     const dissertationOptions = root.querySelectorAll('.js-simple-chatbot-dissertation-option');
     const dissertationQuestion = root.querySelector('.js-simple-chatbot-dissertation-question');
     const dissertationSendBtn = root.querySelector('.js-simple-chatbot-dissertation-send');
+    const dissertationResult = root.querySelector('.js-simple-chatbot-dissertation-result');
+    const dissertationResultBody = root.querySelector('.js-simple-chatbot-dissertation-answer');
+    const dissertationStatus = root.querySelector('.js-simple-chatbot-dissertation-status');
+    const dissertationCopyBtn = root.querySelector('.js-simple-chatbot-dissertation-copy');
 
     let processSections = [];
     let activeProcessSectionId = null;
     let processFinished = false;
     let activeDissertationTopic = '';
+    let lastDissertationReply = '';
 
     function toggleModal(show) {
       if (!modal) {
@@ -369,6 +374,63 @@
       });
     }
 
+    function setDissertationStatus(text) {
+      if (!dissertationStatus) {
+        return;
+      }
+
+      dissertationStatus.textContent = text || '';
+      dissertationStatus.hidden = !text;
+    }
+
+    function renderDissertationReply(text) {
+      if (!dissertationResult || !dissertationResultBody) {
+        return;
+      }
+
+      dissertationResult.hidden = false;
+      dissertationResultBody.innerHTML = '';
+      const body = renderMessageBody(text || 'Nem érkezett válasz.');
+      dissertationResultBody.appendChild(body);
+      lastDissertationReply = text || '';
+    }
+
+    function copyDissertationReply() {
+      if (!lastDissertationReply) {
+        return;
+      }
+
+      function fallbackCopy(text) {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        temp.setAttribute('aria-hidden', 'true');
+        temp.style.position = 'fixed';
+        temp.style.opacity = '0';
+        document.body.appendChild(temp);
+        temp.select();
+        try {
+          document.execCommand('copy');
+          setNotice('Válasz kimásolva.', 'success');
+        } catch (error) {
+          setNotice('Nem sikerült a válasz másolása.', 'error');
+        }
+        document.body.removeChild(temp);
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard
+          .writeText(lastDissertationReply)
+          .then(function () {
+            setNotice('Válasz kimásolva.', 'success');
+          })
+          .catch(function () {
+            fallbackCopy(lastDissertationReply);
+          });
+      } else {
+        fallbackCopy(lastDissertationReply);
+      }
+    }
+
     function buildDissertationPrompt(topic) {
       const extra = dissertationQuestion ? dissertationQuestion.value.trim() : '';
       const resolvedTopic = topic || 'A Hargita megyei WordPress chatbot részletes szakmai bemutatása';
@@ -393,11 +455,36 @@
       const prompt = buildDissertationPrompt(chosenTopic);
 
       setNotice(`Disszertációs segédlet készül: ${chosenTopic}`, 'info');
+      setDissertationStatus('Segédlet készül...');
+      if (dissertationSendBtn) {
+        dissertationSendBtn.disabled = true;
+      }
       if (dissertationQuestion) {
         dissertationQuestion.value = '';
       }
-      toggleModal(false);
-      sendMessage(prompt);
+      return request('/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: prompt }),
+      })
+        .then(function (data) {
+          const reply = data && data.reply ? data.reply : 'Nem érkezett válasz.';
+          renderDissertationReply(reply);
+          setNotice('Disszertációs segédlet elkészült.', 'success');
+          setDissertationStatus('');
+        })
+        .catch(function () {
+          renderDissertationReply('Hoppá, hiba történt. Próbáld újra később.');
+          setNotice('Hiba történt a segédlet lekérésekor.', 'error');
+          setDissertationStatus('');
+        })
+        .finally(function () {
+          if (dissertationSendBtn) {
+            dissertationSendBtn.disabled = false;
+          }
+        });
     }
 
     function ensureActiveSection(sections) {
@@ -1239,6 +1326,12 @@
           setDissertationTopic(fallbackTopic, null);
         }
         sendDissertationPrompt(fallbackTopic);
+      });
+    }
+
+    if (dissertationCopyBtn) {
+      dissertationCopyBtn.addEventListener('click', function () {
+        copyDissertationReply();
       });
     }
 

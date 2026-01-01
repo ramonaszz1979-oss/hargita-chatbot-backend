@@ -30,6 +30,13 @@ if (!defined('ABSPATH')) {
         <div class="simple-chatbot__form-actions">
             <button type="button" class="simple-chatbot__button simple-chatbot__button--primary js-simple-chatbot-dissertation-send"><?php esc_html_e('Segédlet kérése', 'simple-chatbot'); ?></button>
         </div>
+        <div class="simple-chatbot__dissertation-result js-simple-chatbot-dissertation-result" hidden>
+            <div class="simple-chatbot__dissertation-result__header">
+                <div class="simple-chatbot__muted js-simple-chatbot-dissertation-status"></div>
+                <button type="button" class="simple-chatbot__button simple-chatbot__button--ghost js-simple-chatbot-dissertation-copy"><?php esc_html_e('Válasz másolása', 'simple-chatbot'); ?></button>
+            </div>
+            <div class="simple-chatbot__dissertation-answer js-simple-chatbot-dissertation-answer"></div>
+        </div>
         <p class="simple-chatbot__muted"><?php esc_html_e('Téma választásakor azonnal segédlet készül. Ha csak kérdést írsz be, a chatbot a Hargita megyei turisztikai chatbot projektre szabott választ ad.', 'simple-chatbot'); ?></p>
     </div>
 </div>
