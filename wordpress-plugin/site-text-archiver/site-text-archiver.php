@@ -872,6 +872,7 @@ class Site_Text_Archiver {
                     const stopBtn   = progress.querySelector('.sta-stop-run');
                     let pollTimer = null;
                     let activeRun = '';
+                    let reloadScheduled = false;
 
                     const setStatus = (text) => { statusEl.textContent = text || ''; };
                     const setCount  = (text) => { countEl.textContent = text || ''; };
@@ -911,6 +912,13 @@ class Site_Text_Archiver {
 
                         if (['completed', 'stopped', 'error'].indexOf(data.status) !== -1) {
                             stopPolling();
+                        }
+
+                        if (data.status === 'completed' && !reloadScheduled) {
+                            reloadScheduled = true;
+                            window.setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
                         }
                     };
 
