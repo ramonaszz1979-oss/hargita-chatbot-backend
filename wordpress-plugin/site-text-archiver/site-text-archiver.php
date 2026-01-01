@@ -80,9 +80,6 @@ class Site_Text_Archiver {
         <div class="wrap">
             <h1><?php echo esc_html__('Site Text Archiver', 'site-text-archiver'); ?></h1>
             <p><?php esc_html_e('Add hozzá a feldolgozandó weboldalakat, majd indítsd a letöltést.', 'site-text-archiver'); ?></p>
-            <p>
-                <a class="button" href="https://hargita.smartonlineedu.com/site-arhiver/" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Tartalomarchiváló oldal megnyitása', 'site-text-archiver'); ?></a>
-            </p>
             <?php $this->render_messages($messages); ?>
 
             <form method="post" action="" class="sta-crawl-form" id="<?php echo esc_attr($form_id); ?>">
@@ -122,9 +119,6 @@ class Site_Text_Archiver {
         <div class="sta-frontend">
             <h2><?php echo esc_html__('Site Text Archiver', 'site-text-archiver'); ?></h2>
             <p><?php esc_html_e('Add hozzá a feldolgozandó weboldalakat, majd indítsd a letöltést.', 'site-text-archiver'); ?></p>
-            <p>
-                <a class="button" href="https://hargita.smartonlineedu.com/site-arhiver/" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Tartalomarchiváló oldal megnyitása', 'site-text-archiver'); ?></a>
-            </p>
             <?php $this->render_messages($messages); ?>
 
             <form method="post" action="" class="sta-crawl-form" id="<?php echo esc_attr($form_id); ?>">
