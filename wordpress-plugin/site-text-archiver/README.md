@@ -19,6 +19,7 @@ Ha egy menüpontos oldalról szeretnéd megnyitni az archiváló felületet, íg
 ## Működés
 - Az admin és a frontend nézetben dinamikus URL-mezőket kapsz (új sor hozzáadása „+” gombbal, törlés „×”-szel), amelyeket menthetsz vagy közvetlenül futtathatsz a **Letöltés indítása** gombbal. Ha egy már korábban letöltött weboldalt adsz meg, a mező alatt jelölőnégyzetet kapsz, amellyel eldöntheted, hogy a régi fájlokat törölje-e új letöltés előtt.
 - Az oldal alján a meglévő archívumok táblázatban jelennek meg (webcím linkkel, fájlok száma, elérési út), és mindegyik mellett ott a **Törlés** gomb az adott weboldal teljes archívumának eltávolításához. A régiek megmaradnak, amíg kifejezetten nem kéred a törlésüket.
+- A letöltés gomb megnyomása után valós időben frissülő állapotjelző jelenik meg: mutatja, hogy hány .txt fájl készült el, melyik oldalon dolgozik éppen, és a **Letöltés megállítása** gombbal azonnal meg lehet szakítani a folyamatot. A futás végekor a státusz üzenetben látszik az összefoglaló.
 - A korábban letöltött, HTML-ből tisztított szöveges fájlokat továbbra is a `wp-content/uploads/site-text-archives/<domain>/` mappában találod; törléskor a megfelelő mappát és a kapcsolódó metaadatot a bővítmény automatikusan eltávolítja. Az oldalszám nincs korlátozva, minden bejárt aloldal mentésre kerül.
 
 ## Technikai megjegyzés

@@ -14,11 +14,17 @@ class Site_Text_Archiver {
     private $option_name = 'sta_target_urls';
     private $archive_meta_option = 'sta_archive_meta';
     private $archive_dir = 'site-text-archives';
+    private $progress_option = 'sta_crawl_progress';
+    private $stop_option = 'sta_crawl_stop';
 
     public function __construct() {
         add_action('admin_menu', [$this, 'register_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_shortcode('site_text_archiver_form', [$this, 'render_frontend_shortcode']);
+
+        add_action('wp_ajax_sta_start_crawl', [$this, 'ajax_start_crawl']);
+        add_action('wp_ajax_sta_poll_crawl', [$this, 'ajax_poll_crawl']);
+        add_action('wp_ajax_sta_stop_crawl', [$this, 'ajax_stop_crawl']);
     }
 
     public function register_settings() {
@@ -69,6 +75,7 @@ class Site_Text_Archiver {
         $storage_hint            = $this->get_storage_hint();
         $archives                = $this->get_archived_sites();
         $archive_map             = $this->archives_by_slug($archives);
+        $form_id                 = 'sta-admin-form-' . wp_generate_uuid4();
         ?>
         <div class="wrap">
             <h1><?php echo esc_html__('Site Text Archiver', 'site-text-archiver'); ?></h1>
@@ -78,7 +85,7 @@ class Site_Text_Archiver {
             </p>
             <?php $this->render_messages($messages); ?>
 
-            <form method="post" action="">
+            <form method="post" action="" class="sta-crawl-form" id="<?php echo esc_attr($form_id); ?>">
                 <?php wp_nonce_field('sta_crawl_action', 'sta_crawl_nonce'); ?>
                 <input type="hidden" name="sta_action" value="run" />
                 <?php $this->render_url_fields($saved_urls, false, $archive_map); ?>
@@ -88,6 +95,7 @@ class Site_Text_Archiver {
                 </p>
                 <p><em><?php echo esc_html($storage_hint); ?></em></p>
             </form>
+            <?php $this->render_progress_ui($form_id); ?>
             <?php $this->render_archive_list($archives, true); ?>
         </div>
         <?php
@@ -107,6 +115,7 @@ class Site_Text_Archiver {
         $storage_hint            = $this->get_storage_hint();
         $archives                = $this->get_archived_sites();
         $archive_map             = $this->archives_by_slug($archives);
+        $form_id                 = 'sta-frontend-form-' . wp_generate_uuid4();
 
         ob_start();
         ?>
@@ -118,7 +127,7 @@ class Site_Text_Archiver {
             </p>
             <?php $this->render_messages($messages); ?>
 
-            <form method="post" action="">
+            <form method="post" action="" class="sta-crawl-form" id="<?php echo esc_attr($form_id); ?>">
                 <?php wp_nonce_field('sta_crawl_action', 'sta_crawl_nonce'); ?>
                 <input type="hidden" name="sta_action" value="run" />
                 <?php $this->render_url_fields($saved_urls, true, $archive_map); ?>
@@ -128,6 +137,7 @@ class Site_Text_Archiver {
                 </p>
                 <p><em><?php echo esc_html($storage_hint); ?></em></p>
             </form>
+            <?php $this->render_progress_ui($form_id); ?>
             <?php $this->render_archive_list($archives, false); ?>
         </div>
         <?php
@@ -334,18 +344,22 @@ class Site_Text_Archiver {
         <?php
     }
 
-    private function process_urls(array $urls, array $overwrite_request) {
+    private function process_urls(array $urls, array $overwrite_request, $run_id = '') {
         $messages = [];
 
         foreach ($urls as $url) {
-            $log = $this->crawl_site($url, $overwrite_request);
+            $log = $this->crawl_site($url, $overwrite_request, $run_id);
             $messages[] = ['type' => $log['success'] ? 'updated' : 'error', 'text' => $log['message']];
+
+            if ($run_id && $this->should_stop($run_id)) {
+                break;
+            }
         }
 
         return $messages;
     }
 
-    private function crawl_site($url, array $overwrite_request) {
+    private function crawl_site($url, array $overwrite_request, $run_id = '') {
         $host = wp_parse_url($url, PHP_URL_HOST);
         if (empty($host)) {
             return ['success' => false, 'message' => sprintf(__('Hibás URL: %s', 'site-text-archiver'), $url)];
@@ -370,6 +384,19 @@ class Site_Text_Archiver {
         }
 
         while (!empty($queue)) {
+            if ($run_id && $this->should_stop($run_id)) {
+                $this->update_progress($run_id, [
+                    'status'       => 'stopped',
+                    'current_host' => $host,
+                    'message'      => __('A letöltés megszakítva.', 'site-text-archiver'),
+                ]);
+
+                return [
+                    'success' => false,
+                    'message' => sprintf(__('Megállítva: %s', 'site-text-archiver'), $host),
+                ];
+            }
+
             $current = array_shift($queue);
             $normalized = $this->normalize_url($current);
 
@@ -400,6 +427,15 @@ class Site_Text_Archiver {
 
             $this->save_page_as_text($base_dir, $normalized, $body);
             $saved++;
+
+            if ($run_id) {
+                $this->update_progress($run_id, [
+                    'status'       => 'running',
+                    'current_host' => $host,
+                    'saved'        => $saved,
+                    'last_url'     => $normalized,
+                ]);
+            }
 
             foreach ($this->extract_links($body, $host, $normalized) as $link) {
                 if (!isset($visited[$link]) && !in_array($link, $queue, true)) {
@@ -805,6 +841,308 @@ class Site_Text_Archiver {
         foreach ($messages as $message) {
             $class = $message['type'] === 'error' ? 'notice notice-error' : 'notice notice-success';
             echo '<div class="' . esc_attr($class) . '"><p>' . esc_html($message['text']) . '</p></div>';
+        }
+    }
+
+    private function render_progress_ui($form_id) {
+        $ajax_nonce = wp_create_nonce('sta_ajax_nonce');
+        $progress_id = 'sta-progress-' . wp_generate_uuid4();
+        ?>
+        <div class="sta-progress" id="<?php echo esc_attr($progress_id); ?>" data-form="<?php echo esc_attr($form_id); ?>" style="display:none; margin-top: 16px;">
+            <p class="sta-progress__status"><?php esc_html_e('Letöltés indítása...', 'site-text-archiver'); ?></p>
+            <p class="sta-progress__count"></p>
+            <p class="sta-progress__current"></p>
+            <button type="button" class="button button-secondary sta-stop-run" disabled><?php esc_html_e('Letöltés megállítása', 'site-text-archiver'); ?></button>
+        </div>
+        <script>
+            (function() {
+                const ajaxUrl = '<?php echo esc_js(admin_url('admin-ajax.php')); ?>';
+                const nonce   = '<?php echo esc_js($ajax_nonce); ?>';
+
+                const initForm = (formId) => {
+                    const form = document.getElementById(formId);
+                    if (!form) { return; }
+
+                    const progress = document.querySelector('.sta-progress[data-form="' + formId + '"]');
+                    if (!progress) { return; }
+
+                    const statusEl  = progress.querySelector('.sta-progress__status');
+                    const countEl   = progress.querySelector('.sta-progress__count');
+                    const currentEl = progress.querySelector('.sta-progress__current');
+                    const stopBtn   = progress.querySelector('.sta-stop-run');
+                    let pollTimer = null;
+                    let activeRun = '';
+
+                    const setStatus = (text) => { statusEl.textContent = text || ''; };
+                    const setCount  = (text) => { countEl.textContent = text || ''; };
+                    const setCurrent = (text) => { currentEl.textContent = text || ''; };
+
+                    const stopPolling = () => {
+                        if (pollTimer) { clearInterval(pollTimer); }
+                        pollTimer = null;
+                    };
+
+                    const resetUI = () => {
+                        stopPolling();
+                        activeRun = '';
+                        stopBtn.disabled = true;
+                    };
+
+                    const updateUI = (data) => {
+                        setStatus(data.message || '');
+                        if (data.saved) {
+                            setCount('<?php echo esc_js(__('Mentett fájlok: ', 'site-text-archiver')); ?>' + data.saved);
+                        } else {
+                            setCount('');
+                        }
+                        if (data.last_url) {
+                            setCurrent('<?php echo esc_js(__('Aktuális oldal: ', 'site-text-archiver')); ?>' + data.last_url);
+                        } else if (data.current_host) {
+                            setCurrent('<?php echo esc_js(__('Aktuális domain: ', 'site-text-archiver')); ?>' + data.current_host);
+                        } else {
+                            setCurrent('');
+                        }
+
+                        if (data.status === 'running') {
+                            stopBtn.disabled = false;
+                        } else {
+                            stopBtn.disabled = true;
+                        }
+
+                        if (['completed', 'stopped', 'error'].indexOf(data.status) !== -1) {
+                            stopPolling();
+                        }
+                    };
+
+                    const poll = () => {
+                        if (!activeRun) { return; }
+                        const body = new FormData();
+                        body.append('action', 'sta_poll_crawl');
+                        body.append('run_id', activeRun);
+                        body.append('nonce', nonce);
+
+                        fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body })
+                            .then((res) => res.json())
+                            .then((json) => {
+                                if (!json || !json.success) { return; }
+                                updateUI(json.data || {});
+                            })
+                            .catch(() => {});
+                    };
+
+                    const startPolling = () => {
+                        stopPolling();
+                        poll();
+                        pollTimer = window.setInterval(poll, 2000);
+                    };
+
+                    const startCrawl = () => {
+                        const fd = new FormData(form);
+                        const submitter = form._sta_last_submitter;
+                        if (submitter && submitter.value === 'save') { return true; }
+
+                        fd.append('action', 'sta_start_crawl');
+                        fd.append('nonce', nonce);
+
+                        progress.style.display = 'block';
+                        setStatus('<?php echo esc_js(__('Letöltés indítása...', 'site-text-archiver')); ?>');
+                        setCount('');
+                        setCurrent('');
+                        stopBtn.disabled = true;
+
+                        fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+                            .then((res) => res.json())
+                            .then((json) => {
+                                if (!json || !json.success || !json.data) {
+                                    setStatus('<?php echo esc_js(__('A letöltés nem indult el. Ellenőrizd az URL-eket.', 'site-text-archiver')); ?>');
+                                    return;
+                                }
+
+                                activeRun = json.data.run_id;
+                                startPolling();
+                            })
+                            .catch(() => {
+                                setStatus('<?php echo esc_js(__('Hiba történt a letöltés indításakor.', 'site-text-archiver')); ?>');
+                            });
+
+                        return false;
+                    };
+
+                    form.addEventListener('submit', (event) => {
+                        form._sta_last_submitter = event.submitter;
+                        if (event.submitter && event.submitter.value === 'save') {
+                            return;
+                        }
+                        event.preventDefault();
+                        startCrawl();
+                    });
+
+                    stopBtn.addEventListener('click', () => {
+                        if (!activeRun) { return; }
+                        const body = new FormData();
+                        body.append('action', 'sta_stop_crawl');
+                        body.append('run_id', activeRun);
+                        body.append('nonce', nonce);
+
+                        stopBtn.disabled = true;
+                        setStatus('<?php echo esc_js(__('Megállítás kérése...', 'site-text-archiver')); ?>');
+
+                        fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body })
+                            .then((res) => res.json())
+                            .then((json) => {
+                                if (json && json.success) {
+                                    setStatus('<?php echo esc_js(__('A letöltés hamarosan megáll.', 'site-text-archiver')); ?>');
+                                }
+                            })
+                            .catch(() => {});
+                    });
+                };
+
+                document.addEventListener('DOMContentLoaded', () => {
+                    initForm('<?php echo esc_js($form_id); ?>');
+                });
+            })();
+        </script>
+        <?php
+    }
+
+    public function ajax_start_crawl() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Nincs jogosultságod a letöltés indításához.', 'site-text-archiver')]);
+        }
+
+        if (empty($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'sta_ajax_nonce')) {
+            wp_send_json_error(['message' => __('Érvénytelen biztonsági ellenőrzés.', 'site-text-archiver')]);
+        }
+
+        $submitted_urls = isset($_POST[$this->option_name]) ? wp_unslash($_POST[$this->option_name]) : '';
+        $urls           = $this->sanitize_urls($submitted_urls);
+        $overwrite      = $this->sanitize_overwrite_request();
+
+        update_option($this->option_name, $urls);
+
+        if (empty($urls)) {
+            wp_send_json_error(['message' => __('Nincs érvényes URL megadva.', 'site-text-archiver')]);
+        }
+
+        $run_id = wp_generate_uuid4();
+        $this->init_progress($run_id);
+        $this->clear_stop_flag($run_id);
+
+        $this->send_async_json(['run_id' => $run_id]);
+
+        $messages = $this->process_urls($urls, $overwrite, $run_id);
+
+        $summary = implode(' ', array_map(function ($item) {
+            return $item['text'];
+        }, $messages));
+
+        if ($this->should_stop($run_id)) {
+            $this->update_progress($run_id, [
+                'status'  => 'stopped',
+                'message' => $summary ?: __('A letöltés megállítva.', 'site-text-archiver'),
+            ]);
+        } else {
+            $this->update_progress($run_id, [
+                'status'  => 'completed',
+                'message' => $summary,
+            ]);
+        }
+
+        $this->clear_stop_flag($run_id);
+        exit;
+    }
+
+    public function ajax_poll_crawl() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error();
+        }
+
+        if (empty($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'sta_ajax_nonce')) {
+            wp_send_json_error();
+        }
+
+        $run_id = isset($_POST['run_id']) ? sanitize_text_field(wp_unslash($_POST['run_id'])) : '';
+        $state  = $this->get_progress();
+
+        if (empty($run_id) || empty($state) || $state['run_id'] !== $run_id) {
+            wp_send_json_error();
+        }
+
+        wp_send_json_success($state);
+    }
+
+    public function ajax_stop_crawl() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error();
+        }
+
+        if (empty($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'sta_ajax_nonce')) {
+            wp_send_json_error();
+        }
+
+        $run_id = isset($_POST['run_id']) ? sanitize_text_field(wp_unslash($_POST['run_id'])) : '';
+        $state  = $this->get_progress();
+
+        if (empty($run_id) || empty($state) || $state['run_id'] !== $run_id) {
+            wp_send_json_error();
+        }
+
+        update_option($this->stop_option, $run_id);
+        wp_send_json_success(['message' => __('Megállítás kérése sikeres.', 'site-text-archiver')]);
+    }
+
+    private function init_progress($run_id) {
+        $state = [
+            'run_id'       => $run_id,
+            'status'       => 'running',
+            'current_host' => '',
+            'last_url'     => '',
+            'saved'        => 0,
+            'message'      => __('Letöltés indítása...', 'site-text-archiver'),
+        ];
+
+        update_option($this->progress_option, $state);
+    }
+
+    private function update_progress($run_id, array $data) {
+        $state = $this->get_progress();
+        if (empty($state) || $state['run_id'] !== $run_id) {
+            return;
+        }
+
+        $state = array_merge($state, $data);
+        update_option($this->progress_option, $state);
+    }
+
+    private function get_progress() {
+        $state = get_option($this->progress_option, []);
+        return is_array($state) ? $state : [];
+    }
+
+    private function should_stop($run_id) {
+        $flag = get_option($this->stop_option);
+        return !empty($flag) && $flag === $run_id;
+    }
+
+    private function clear_stop_flag($run_id) {
+        $flag = get_option($this->stop_option);
+        if ($flag === $run_id) {
+            delete_option($this->stop_option);
+        }
+    }
+
+    private function send_async_json(array $payload) {
+        nocache_headers();
+        header('Content-Type: application/json; charset=' . get_option('blog_charset'));
+        echo wp_json_encode(['success' => true, 'data' => $payload]);
+        echo str_repeat(' ', 1024);
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } elseif (function_exists('litespeed_finish_request')) {
+            litespeed_finish_request();
+        } else {
+            flush();
         }
     }
 }
