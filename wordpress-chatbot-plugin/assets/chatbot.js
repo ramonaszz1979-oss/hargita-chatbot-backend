@@ -11,7 +11,23 @@
   const embedUrl = window.SimpleChatbotData.embedUrl || `${window.location.origin}/?simple_chatbot_embed=1`;
   const embedCode =
     window.SimpleChatbotData.embedCode ||
-    `<iframe src="${embedUrl}" style="border:0;width:100%;max-width:420px;height:640px;" loading="lazy"></iframe>`;
+    `<style>
+  .simple-chatbot-floating-frame {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 380px;
+    max-width: 90vw;
+    height: 520px;
+    max-height: 80vh;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    overflow: hidden;
+  }
+</style>
+<iframe class="simple-chatbot-floating-frame" src="${embedUrl}" loading="lazy" title="Chatbot"></iframe>`;
 
   function request(path, options) {
     return fetch(`${apiBase}${path}`, {
@@ -243,10 +259,12 @@
     const dissertationPanel = root.querySelector('.js-simple-chatbot-dissertation-panel');
     const dissertationOptions = root.querySelectorAll('.js-simple-chatbot-dissertation-option');
     const dissertationQuestion = root.querySelector('.js-simple-chatbot-dissertation-question');
+    const dissertationSendBtn = root.querySelector('.js-simple-chatbot-dissertation-send');
 
     let processSections = [];
     let activeProcessSectionId = null;
     let processFinished = false;
+    let activeDissertationTopic = '';
 
     function toggleModal(show) {
       if (!modal) {
@@ -342,12 +360,23 @@
       }
     }
 
+    function setDissertationTopic(topic, button) {
+      activeDissertationTopic = topic || '';
+
+      dissertationOptions.forEach(function (option) {
+        option.classList.toggle('is-active', option === button);
+        option.setAttribute('aria-pressed', option === button ? 'true' : 'false');
+      });
+    }
+
     function buildDissertationPrompt(topic) {
       const extra = dissertationQuestion ? dissertationQuestion.value.trim() : '';
+      const resolvedTopic = topic || 'A Hargita megyei WordPress chatbot részletes szakmai bemutatása';
       const lines = [
-        `Készíts részletes, reális disszertációs dolgozat segédletet a következő témában: ${topic}.`,
-        'Adj magyar nyelvű vázlatot fejezetcímekkel, kutatási kérdéseket, módszertani javaslatot, adatforrás ötleteket, ütemtervet és értékelési szempontokat.',
-        'A segédlet legyen strukturált, pontokba szedett és hivatkozásra kész.',
+        `Készíts részletes, reális disszertációs dolgozat segédletet a következő témában: ${resolvedTopic}.`,
+        'A leírás a jelenleg készülő Hargita megyei turisztikai WordPress chatbot projekthez készüljön, amely OpenAI Chat Completions API-t használ, fájl- és webarchív tudásanyagot olvas be a wp-content/uploads/site-text-archives mappából, folyamat-alapú navigációs pontokat jelenít meg, valamint Google űrlap CTA-kat tud nyitni.',
+        'Adj magyar nyelvű vázlatot fejezetcímekkel, kutatási kérdéseket, módszertani javaslatot, adatforrás ötleteket, ütemtervet és értékelési szempontokat, kitérve arra, hogyan illeszthető a chatbot a weboldalba az iframe kóddal.',
+        'A segédlet legyen strukturált, pontokba szedett, hivatkozásra kész és tartalmazzon gyakorlati, a weboldalra publikálható megfogalmazásokat.',
       ];
 
       if (extra) {
@@ -358,12 +387,10 @@
     }
 
     function sendDissertationPrompt(topic) {
-      if (!topic) {
-        return;
-      }
+      const chosenTopic = topic || activeDissertationTopic || 'A Hargita megyei WordPress chatbot részletes szakmai bemutatása';
+      const prompt = buildDissertationPrompt(chosenTopic);
 
-      const prompt = buildDissertationPrompt(topic);
-      setNotice(`Disszertációs segédlet készül: ${topic}`, 'info');
+      setNotice(`Disszertációs segédlet készül: ${chosenTopic}`, 'info');
       if (dissertationQuestion) {
         dissertationQuestion.value = '';
       }
@@ -1197,8 +1224,19 @@
       dissertationOptions.forEach(function (button) {
         button.addEventListener('click', function () {
           const topic = button.dataset.topic || button.textContent || '';
+          setDissertationTopic(topic, button);
           sendDissertationPrompt(topic);
         });
+      });
+    }
+
+    if (dissertationSendBtn) {
+      dissertationSendBtn.addEventListener('click', function () {
+        const fallbackTopic = activeDissertationTopic || (dissertationOptions[0] ? dissertationOptions[0].dataset.topic || dissertationOptions[0].textContent : '');
+        if (fallbackTopic) {
+          setDissertationTopic(fallbackTopic, null);
+        }
+        sendDissertationPrompt(fallbackTopic);
       });
     }
 

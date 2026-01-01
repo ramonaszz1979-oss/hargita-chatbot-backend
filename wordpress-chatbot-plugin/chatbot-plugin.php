@@ -133,7 +133,7 @@ class SimpleChatbotPlugin
         $isEmbed = $this->is_embed_request();
         $embedUrl = add_query_arg('simple_chatbot_embed', '1', home_url('/'));
         $embedCode = sprintf(
-            '<iframe src="%s" style="border:0;width:100%%;max-width:420px;height:640px;" loading="lazy"></iframe>',
+            "<style>\n  .simple-chatbot-floating-frame {\n    position: fixed;\n    bottom: 16px;\n    right: 16px;\n    width: 380px;\n    max-width: 90vw;\n    height: 520px;\n    max-height: 80vh;\n    border: 0;\n    border-radius: 12px;\n    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);\n    z-index: 9999;\n    overflow: hidden;\n  }\n</style>\n<iframe class=\"simple-chatbot-floating-frame\" src=\"%s\" loading=\"lazy\" title=\"Chatbot\"></iframe>",
             esc_url($embedUrl)
         );
 
@@ -390,6 +390,7 @@ class SimpleChatbotPlugin
                             <button class="simple-chatbot__tab" type="button" data-tab-target="files" role="tab" aria-selected="false"><?php esc_html_e('Fájlok', 'simple-chatbot'); ?></button>
                             <button class="simple-chatbot__tab" type="button" data-tab-target="urls" role="tab" aria-selected="false"><?php esc_html_e('Weboldalak', 'simple-chatbot'); ?></button>
                             <button class="simple-chatbot__tab" type="button" data-tab-target="process" role="tab" aria-selected="false"><?php esc_html_e('Folyamat szerkesztő', 'simple-chatbot'); ?></button>
+                            <button class="simple-chatbot__tab" type="button" data-tab-target="dissertation" role="tab" aria-selected="false"><?php esc_html_e('Disszertáció', 'simple-chatbot'); ?></button>
                         </div>
 
                         <div class="simple-chatbot__tab-panels">
@@ -438,6 +439,10 @@ class SimpleChatbotPlugin
                                     </form>
                                     <ul class="simple-chatbot__process-list js-simple-chatbot-processes"></ul>
                                 </div>
+                            </div>
+
+                            <div class="simple-chatbot__tab-panel" data-tab-panel="dissertation" role="tabpanel" aria-hidden="true">
+                                <?php include plugin_dir_path(__FILE__) . 'templates/dissertation-settings-tab.php'; ?>
                             </div>
                         </div>
                         <div class="simple-chatbot__notice js-simple-chatbot-notice" hidden></div>
