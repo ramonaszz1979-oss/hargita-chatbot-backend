@@ -1029,6 +1029,11 @@ class SimpleChatbotPlugin
 
         $parts = [];
 
+        $uploadedTxt = $this->collect_uploaded_txt_sources();
+        if ($uploadedTxt !== '') {
+            $parts[] = $uploadedTxt;
+        }
+
         $archiveText = $this->collect_site_archive_texts();
         if ($archiveText !== '') {
             $parts[] = $archiveText;
@@ -1097,6 +1102,49 @@ class SimpleChatbotPlugin
                 $content = $this->get_file_text($path, $mime);
 
                 if ($content !== '') {
+                    $buffer .= "\n\n" . $content;
+                }
+            }
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        return trim($buffer);
+    }
+
+    private function collect_uploaded_txt_sources(): string
+    {
+        $uploads = wp_upload_dir();
+
+        if (!isset($uploads['basedir']) || $uploads['basedir'] === '') {
+            return '';
+        }
+
+        $root = trailingslashit($uploads['basedir']);
+
+        if (!is_dir($root)) {
+            return '';
+        }
+
+        $buffer = '';
+
+        try {
+            $dir = new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS);
+            $iterator = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::SELF_FIRST);
+            $iterator->setMaxDepth(2);
+
+            foreach ($iterator as $fileInfo) {
+                if (!$fileInfo->isFile()) {
+                    continue;
+                }
+
+                if (strtolower($fileInfo->getExtension()) !== 'txt') {
+                    continue;
+                }
+
+                $content = @file_get_contents($fileInfo->getPathname());
+
+                if ($content !== false && trim($content) !== '') {
                     $buffer .= "\n\n" . $content;
                 }
             }
