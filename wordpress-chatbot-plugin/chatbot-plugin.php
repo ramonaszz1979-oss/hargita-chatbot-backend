@@ -108,6 +108,7 @@ class SimpleChatbotPlugin
                     align-items: flex-end;
                     padding: 16px;
                     box-sizing: border-box;
+                    position: relative;
                 }
 
                 .simple-chatbot {
@@ -354,10 +355,18 @@ class SimpleChatbotPlugin
 
         $welcome = $this->get_welcome_message();
         $isEmbed = $this->is_embed_request();
+        $container_classes = ['simple-chatbot'];
+
+        if ($isEmbed) {
+            $container_classes[] = 'simple-chatbot--embed';
+        }
 
         ob_start();
         ?>
-        <div class="simple-chatbot" data-title="<?php echo esc_attr($atts['title']); ?>" data-welcome="<?php echo esc_attr($welcome); ?>">
+        <div class="<?php echo esc_attr(implode(' ', $container_classes)); ?>" data-title="<?php echo esc_attr($atts['title']); ?>" data-welcome="<?php echo esc_attr($welcome); ?>">
+            <?php if ($isEmbed) : ?>
+                <button class="simple-chatbot__launcher js-simple-chatbot-launcher" type="button" aria-label="<?php esc_attr_e('Chatbot megnyitása', 'simple-chatbot'); ?>" aria-expanded="false">💬</button>
+            <?php endif; ?>
             <?php if (!$isEmbed) : ?>
                 <div class="simple-chatbot__actions">
                     <button class="simple-chatbot__button js-simple-chatbot-settings" <?php disabled(!current_user_can('manage_options')); ?>><?php esc_html_e('Beállítások', 'simple-chatbot'); ?></button>
@@ -366,6 +375,9 @@ class SimpleChatbotPlugin
             <?php endif; ?>
             <div class="simple-chatbot__panel simple-chatbot__panel--preview">
                 <div class="simple-chatbot__header"><?php echo esc_html($atts['title']); ?></div>
+                <?php if ($isEmbed) : ?>
+                    <button class="simple-chatbot__panel-close js-simple-chatbot-close-panel" type="button" aria-label="<?php esc_attr_e('Chat panel bezárása', 'simple-chatbot'); ?>">×</button>
+                <?php endif; ?>
                 <div class="simple-chatbot__process-nav js-simple-chatbot-process-nav" hidden>
                     <div class="simple-chatbot__process-chips js-simple-chatbot-section-chips" role="tablist" aria-label="<?php esc_attr_e('Folyamat szekciók', 'simple-chatbot'); ?>">
                     </div>

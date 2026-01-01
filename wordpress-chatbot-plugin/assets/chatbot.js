@@ -8,6 +8,7 @@
   const defaultTitle = window.SimpleChatbotData.title;
   const defaultWelcome = window.SimpleChatbotData.welcomeMessage || `${defaultTitle} bekapcsolva. Írj egy kérdést!`;
   const canManage = !!window.SimpleChatbotData.canManage;
+  const isEmbedMode = !!window.SimpleChatbotData.isEmbed;
   const embedUrl = window.SimpleChatbotData.embedUrl || `${window.location.origin}/?simple_chatbot_embed=1`;
   const embedCode =
     window.SimpleChatbotData.embedCode ||
@@ -216,6 +217,12 @@
     const welcomeText = root.dataset.welcome || defaultWelcome || `${title} bekapcsolva. Írj egy kérdést!`;
     appendMessage(welcomeText, 'bot');
 
+    if (isEmbedMode) {
+      setEmbedVisibility(false);
+    } else {
+      setEmbedVisibility(true);
+    }
+
     function normalizeUrl(url) {
       if (!url || typeof url !== 'string') {
         return '';
@@ -251,6 +258,9 @@
     const processNav = root.querySelector('.js-simple-chatbot-process-nav');
     const processChips = root.querySelector('.js-simple-chatbot-section-chips');
     const processChoices = root.querySelector('.js-simple-chatbot-choices');
+    const launcherBtn = root.querySelector('.js-simple-chatbot-launcher');
+    const closePanelBtn = root.querySelector('.js-simple-chatbot-close-panel');
+    const panel = root.querySelector('.simple-chatbot__panel');
     const embedToggle = root.querySelector('.js-simple-chatbot-embed-toggle');
     const embedPanel = root.querySelector('.js-simple-chatbot-embed-panel');
     const embedCodeField = root.querySelector('.js-simple-chatbot-embed-code');
@@ -300,6 +310,28 @@
       noticeEl.textContent = text;
       noticeEl.hidden = false;
       noticeEl.className = `simple-chatbot__notice js-simple-chatbot-notice simple-chatbot__notice--${type || 'info'}`;
+    }
+
+    function setEmbedVisibility(show) {
+      if (!panel) {
+        return;
+      }
+
+      if (!isEmbedMode) {
+        panel.hidden = false;
+        return;
+      }
+
+      const shouldShow = !!show;
+      panel.hidden = !shouldShow;
+      panel.classList.toggle('is-collapsed', !shouldShow);
+      root.classList.toggle('is-embed-open', shouldShow);
+      root.classList.toggle('is-embed-collapsed', !shouldShow);
+
+      if (launcherBtn) {
+        launcherBtn.hidden = shouldShow;
+        launcherBtn.setAttribute('aria-expanded', shouldShow ? 'true' : 'false');
+      }
     }
 
     function hydrateEmbedCode() {
@@ -1244,6 +1276,18 @@
         activateTab('general');
         loadSettings();
         loadProcesses(true);
+      });
+    }
+
+    if (launcherBtn && isEmbedMode) {
+      launcherBtn.addEventListener('click', function () {
+        setEmbedVisibility(true);
+      });
+    }
+
+    if (closePanelBtn && isEmbedMode) {
+      closePanelBtn.addEventListener('click', function () {
+        setEmbedVisibility(false);
       });
     }
 
