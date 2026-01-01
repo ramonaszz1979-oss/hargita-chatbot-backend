@@ -29,6 +29,11 @@ class SimpleChatbotPlugin
     /** @var SimpleChatbotProcessManager */
     private $processManager;
 
+    private function is_embed_request(): bool
+    {
+        return !empty(get_query_var('simple_chatbot_embed')) || isset($_GET['simple_chatbot_embed']);
+    }
+
     public function __construct()
     {
         add_shortcode('simple_chatbot', [$this, 'render_chatbot']);
@@ -125,6 +130,7 @@ class SimpleChatbotPlugin
 
     public function enqueue_assets()
     {
+        $isEmbed = $this->is_embed_request();
         $embedUrl = add_query_arg('simple_chatbot_embed', '1', home_url('/'));
         $embedCode = sprintf(
             '<iframe src="%s" style="border:0;width:100%%;max-width:420px;height:640px;" loading="lazy"></iframe>',
@@ -151,9 +157,10 @@ class SimpleChatbotPlugin
             'nonce' => wp_create_nonce('wp_rest'),
             'title' => get_option(self::OPTION_KEY, __('Chatbot', 'simple-chatbot')),
             'welcomeMessage' => $this->get_welcome_message(),
-            'canManage' => current_user_can('manage_options'),
+            'canManage' => $isEmbed ? false : current_user_can('manage_options'),
             'embedUrl' => esc_url_raw($embedUrl),
             'embedCode' => $embedCode,
+            'isEmbed' => $isEmbed,
         ]);
     }
 
@@ -346,14 +353,17 @@ class SimpleChatbotPlugin
         ], $atts);
 
         $welcome = $this->get_welcome_message();
+        $isEmbed = $this->is_embed_request();
 
         ob_start();
         ?>
         <div class="simple-chatbot" data-title="<?php echo esc_attr($atts['title']); ?>" data-welcome="<?php echo esc_attr($welcome); ?>">
-            <div class="simple-chatbot__actions">
-                <button class="simple-chatbot__button js-simple-chatbot-settings" <?php disabled(!current_user_can('manage_options')); ?>><?php esc_html_e('Beállítások', 'simple-chatbot'); ?></button>
-                <button class="simple-chatbot__button simple-chatbot__button--ghost js-simple-chatbot-preview"><?php esc_html_e('Preview', 'simple-chatbot'); ?></button>
-            </div>
+            <?php if (!$isEmbed) : ?>
+                <div class="simple-chatbot__actions">
+                    <button class="simple-chatbot__button js-simple-chatbot-settings" <?php disabled(!current_user_can('manage_options')); ?>><?php esc_html_e('Beállítások', 'simple-chatbot'); ?></button>
+                    <button class="simple-chatbot__button simple-chatbot__button--ghost js-simple-chatbot-preview"><?php esc_html_e('Preview', 'simple-chatbot'); ?></button>
+                </div>
+            <?php endif; ?>
             <div class="simple-chatbot__panel simple-chatbot__panel--preview">
                 <div class="simple-chatbot__header"><?php echo esc_html($atts['title']); ?></div>
                 <div class="simple-chatbot__process-nav js-simple-chatbot-process-nav" hidden>
