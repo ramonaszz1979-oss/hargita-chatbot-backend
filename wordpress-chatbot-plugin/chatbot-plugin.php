@@ -375,7 +375,7 @@ class SimpleChatbotPlugin
             <?php endif; ?>
             <?php if (!$isEmbed) : ?>
                 <div class="simple-chatbot__actions">
-                    <button class="simple-chatbot__button js-simple-chatbot-settings" <?php disabled(!current_user_can('manage_options')); ?>><?php esc_html_e('Beállítások', 'simple-chatbot'); ?></button>
+                    <button class="simple-chatbot__button js-simple-chatbot-settings" aria-disabled="<?php echo current_user_can('manage_options') ? 'false' : 'true'; ?>"><?php esc_html_e('Beállítások', 'simple-chatbot'); ?></button>
                     <button class="simple-chatbot__button simple-chatbot__button--ghost js-simple-chatbot-preview"><?php esc_html_e('Preview', 'simple-chatbot'); ?></button>
                 </div>
             <?php endif; ?>
