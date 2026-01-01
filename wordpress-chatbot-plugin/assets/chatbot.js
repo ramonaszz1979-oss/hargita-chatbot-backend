@@ -374,9 +374,11 @@
       const resolvedTopic = topic || 'A Hargita megyei WordPress chatbot részletes szakmai bemutatása';
       const lines = [
         `Készíts részletes, reális disszertációs dolgozat segédletet a következő témában: ${resolvedTopic}.`,
-        'A leírás a jelenleg készülő Hargita megyei turisztikai WordPress chatbot projekthez készüljön, amely OpenAI Chat Completions API-t használ, fájl- és webarchív tudásanyagot olvas be a wp-content/uploads/site-text-archives mappából, folyamat-alapú navigációs pontokat jelenít meg, valamint Google űrlap CTA-kat tud nyitni.',
-        'Adj magyar nyelvű vázlatot fejezetcímekkel, kutatási kérdéseket, módszertani javaslatot, adatforrás ötleteket, ütemtervet és értékelési szempontokat, kitérve arra, hogyan illeszthető a chatbot a weboldalba az iframe kóddal.',
-        'A segédlet legyen strukturált, pontokba szedett, hivatkozásra kész és tartalmazzon gyakorlati, a weboldalra publikálható megfogalmazásokat.',
+        'A segédlet szóljon a most készülő Hargita megyei turisztikai WordPress chatbot projektről: OpenAI Chat Completions API-t használ, a wp-content/uploads/site-text-archives mappából és webarchív oldalakról tölt be tudást, start/end alapú folyamat-szekciókat és kattintható válaszlehetőségeket jelenít meg, valamint Google űrlap CTA gombokkal vezeti a kitöltést.',
+        'Készíts magyar nyelvű, publikálható vázlatot fejezetcímekkel (pl. Bevezetés, Célkitűzések, Rendszerarchitektúra, Tudásanyag kezelése, Folyamatvezérelt UI, Integráció és beágyazás, Biztonság, Tesztelés, Eredmények, Összegzés).',
+        'Írd le a működési elvet (adatáramlás: felhasználói üzenet → frontend JS formázás → REST → OpenAI → válasz megjelenítés), a megvalósítás fő lépéseit (WordPress plugin, shortcode, REST végpontok, tudás-cache, folyamat szerkesztő, iframe-es beágyazási kód), valamint a technikai stack-et.',
+        'Adj kutatási kérdéseket, módszertani javaslatot (pl. kvalitatív tesztek, válasz-minőség mérése, teljesítmény-optimalizálás), adatforrás ötleteket, ütemtervet, kockázatkezelést és értékelési szempontokat.',
+        'Használj felsorolásokat és számozást csak indokolt helyen, hogy áttekinthető, szerkeszthető segédlet jöjjön létre, amit beilleszthetünk a dolgozat megfelelő fejezeteibe.',
       ];
 
       if (extra) {
