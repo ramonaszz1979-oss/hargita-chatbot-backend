@@ -3,6 +3,8 @@ class File_Text_Archive {
     private $option_key = 'file_text_archive_items';
     private $archive_dir;
     private $archive_url;
+    private $admin_page = 'file-text-archive';
+    private $tools_page = 'file-text-archive-tools';
 
     public function __construct() {
         $upload_dir        = wp_upload_dir();
@@ -24,9 +26,17 @@ class File_Text_Archive {
             __( 'File Text Archive', 'file-text-archive' ),
             __( 'Text Archive', 'file-text-archive' ),
             'manage_options',
-            'file-text-archive',
+            $this->admin_page,
             array( $this, 'render_admin_page' ),
             'dashicons-media-document'
+        );
+
+        add_management_page(
+            __( 'File Text Archive', 'file-text-archive' ),
+            __( 'File Text Archive', 'file-text-archive' ),
+            'upload_files',
+            $this->tools_page,
+            array( $this, 'render_admin_page' )
         );
     }
 
@@ -61,6 +71,7 @@ class File_Text_Archive {
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field( 'fta_upload' ); ?>
                 <input type="hidden" name="action" value="fta_upload" />
+                <input type="hidden" name="fta_return" value="<?php echo esc_url( $this->current_page_url() ); ?>" />
                 <input type="file" name="fta_file" required />
                 <?php submit_button( __( 'Upload and archive', 'file-text-archive' ) ); ?>
             </form>
@@ -101,6 +112,7 @@ class File_Text_Archive {
                                 <?php wp_nonce_field( 'fta_delete_' . $item['id'] ); ?>
                                 <input type="hidden" name="action" value="fta_delete" />
                                 <input type="hidden" name="fta_id" value="<?php echo esc_attr( $item['id'] ); ?>" />
+                                <input type="hidden" name="fta_return" value="<?php echo esc_url( $this->current_page_url() ); ?>" />
                                 <?php submit_button( __( 'Delete', 'file-text-archive' ), 'delete', 'submit', false ); ?>
                             </form>
                         </td>
@@ -129,6 +141,7 @@ class File_Text_Archive {
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field( 'fta_upload' ); ?>
                 <input type="hidden" name="action" value="fta_upload" />
+                <input type="hidden" name="fta_return" value="<?php echo esc_url( $this->current_page_url() ); ?>" />
                 <input type="file" name="fta_file" required />
                 <?php submit_button( __( 'Upload and archive', 'file-text-archive' ) ); ?>
             </form>
@@ -148,8 +161,10 @@ class File_Text_Archive {
 
         check_admin_referer( 'fta_upload' );
 
+        $return_url = isset( $_POST['fta_return'] ) ? esc_url_raw( wp_unslash( $_POST['fta_return'] ) ) : '';
+
         if ( empty( $_FILES['fta_file']['tmp_name'] ) ) {
-            $this->redirect_with_message( 'error', __( 'No file received.', 'file-text-archive' ) );
+            $this->redirect_with_message( 'error', __( 'No file received.', 'file-text-archive' ), $return_url );
         }
 
         $this->ensure_archive_directory();
@@ -163,7 +178,7 @@ class File_Text_Archive {
         );
 
         if ( isset( $uploaded['error'] ) ) {
-            $this->redirect_with_message( 'error', $uploaded['error'] );
+            $this->redirect_with_message( 'error', $uploaded['error'], $return_url );
         }
 
         $text_content = $this->extract_text( $uploaded['file'] );
@@ -189,7 +204,7 @@ class File_Text_Archive {
 
         update_option( $this->option_key, $items );
 
-        $this->redirect_with_message( 'uploaded' );
+        $this->redirect_with_message( 'uploaded', '', $return_url );
     }
 
     public function handle_delete() {
@@ -198,6 +213,7 @@ class File_Text_Archive {
         }
 
         $fta_id = isset( $_POST['fta_id'] ) ? sanitize_text_field( wp_unslash( $_POST['fta_id'] ) ) : '';
+        $return_url = isset( $_POST['fta_return'] ) ? esc_url_raw( wp_unslash( $_POST['fta_return'] ) ) : '';
 
         check_admin_referer( 'fta_delete_' . $fta_id );
 
@@ -215,12 +231,12 @@ class File_Text_Archive {
 
                 unset( $items[ $index ] );
                 update_option( $this->option_key, array_values( $items ) );
-                $this->redirect_with_message( 'deleted' );
+                $this->redirect_with_message( 'deleted', '', $return_url );
                 return;
             }
         }
 
-        $this->redirect_with_message( 'error', __( 'Item not found.', 'file-text-archive' ) );
+        $this->redirect_with_message( 'error', __( 'Item not found.', 'file-text-archive' ), $return_url );
     }
 
     public function ensure_archive_directory() {
@@ -229,14 +245,28 @@ class File_Text_Archive {
         }
     }
 
-    private function redirect_with_message( $status, $message = '' ) {
-        $args = array( 'page' => 'file-text-archive', 'fta_status' => $status );
+    private function redirect_with_message( $status, $message = '', $return_url = '' ) {
+        $default_url = add_query_arg( array( 'page' => $this->admin_page ), admin_url( 'admin.php' ) );
+        $target_url  = $return_url ? wp_validate_redirect( $return_url, $default_url ) : $default_url;
+
+        $args = array( 'fta_status' => $status );
         if ( $message ) {
             $args['fta_message'] = $message;
         }
 
-        wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
+        wp_safe_redirect( add_query_arg( $args, $target_url ) );
         exit;
+    }
+
+    private function current_page_url() {
+        if ( is_admin() ) {
+            $page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : $this->admin_page; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            return add_query_arg( array( 'page' => $page ), admin_url( 'admin.php' ) );
+        }
+
+        $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+
+        return $request_uri ? home_url( $request_uri ) : add_query_arg( array( 'page' => $this->admin_page ), admin_url( 'admin.php' ) );
     }
 
     private function extract_text( $file_path ) {

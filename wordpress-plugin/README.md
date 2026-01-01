@@ -16,6 +16,10 @@ A shortcode csak olyan felhasználóknak jelenít meg feltöltőmezőt, akik ren
 2. A WordPress adminban válaszd a **Bővítmények → Új hozzáadása → Bővítmény feltöltése** menüpontot.
 3. Tallózd be a ZIP-et, majd telepítsd és aktiváld a bővítményt.
 
+Aktiválás után két helyen is eléred a felületet:
+- **Saját menüpont**: **Text Archive** a bal oldali admin menüben.
+- **Eszközök menü**: **Eszközök → File Text Archive**, ahol ugyanaz a feltöltő és lista felület elérhető.
+
 ## Hibaelhárítás
 - PDF-ek esetén a pontos szövegkinyeréshez telepítsd a `pdftotext` eszközt (pl. `poppler-utils`).
 - Törléskor a bővítmény az eredeti fájlt és a generált TXT-t is eltávolítja az archívumból.
