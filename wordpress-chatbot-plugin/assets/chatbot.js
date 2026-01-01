@@ -265,6 +265,8 @@
     const embedPanel = root.querySelector('.js-simple-chatbot-embed-panel');
     const embedCodeField = root.querySelector('.js-simple-chatbot-embed-code');
     const embedCopyBtn = root.querySelector('.js-simple-chatbot-copy-embed');
+    const trainBtn = root.querySelector('.js-simple-chatbot-train');
+    const trainStatus = root.querySelector('.js-simple-chatbot-train-status');
     const dissertationToggle = root.querySelector('.js-simple-chatbot-dissertation-toggle');
     const dissertationPanel = root.querySelector('.js-simple-chatbot-dissertation-panel');
     const dissertationOptions = root.querySelectorAll('.js-simple-chatbot-dissertation-option');
@@ -310,6 +312,14 @@
       noticeEl.textContent = text;
       noticeEl.hidden = false;
       noticeEl.className = `simple-chatbot__notice js-simple-chatbot-notice simple-chatbot__notice--${type || 'info'}`;
+    }
+
+    function setTrainStatus(text) {
+      if (!trainStatus) {
+        return;
+      }
+
+      trainStatus.textContent = text || '';
     }
 
     function setEmbedVisibility(show) {
@@ -1243,6 +1253,8 @@
         if (welcomeInput) welcomeInput.value = data.welcome_message || '';
       }
 
+      setTrainStatus('');
+
       if (data.welcome_message) {
         root.dataset.welcome = data.welcome_message;
       }
@@ -1263,6 +1275,39 @@
         })
         .catch(function () {
           setNotice('Nem sikerült betölteni a beállításokat.', 'error');
+        });
+    }
+
+    function runTraining() {
+      setNotice('Betanítás indítása...', 'info');
+      setTrainStatus('Betanítás folyamatban...');
+      if (trainBtn) {
+        trainBtn.disabled = true;
+      }
+
+      request('/train', { method: 'POST' })
+        .then(function (data) {
+          const message = data && data.message ? data.message : 'Betanítás befejezve.';
+          const isSuccess = data && typeof data.success === 'boolean' ? data.success : true;
+
+          setNotice(message, isSuccess ? 'success' : 'error');
+
+          if (data && data.preview) {
+            const previewText = String(data.preview);
+            const clipped = previewText.length > 220 ? `${previewText.slice(0, 220)}…` : previewText;
+            setTrainStatus(`Előnézet: ${clipped}`);
+          } else {
+            setTrainStatus('');
+          }
+        })
+        .catch(function () {
+          setNotice('Nem sikerült a betanítás lefuttatása.', 'error');
+          setTrainStatus('Hiba történt a betanítás során.');
+        })
+        .finally(function () {
+          if (trainBtn) {
+            trainBtn.disabled = false;
+          }
         });
     }
 
@@ -1343,6 +1388,12 @@
       embedCopyBtn.addEventListener('click', function () {
         hydrateEmbedCode();
         copyEmbedSnippet();
+      });
+    }
+
+    if (trainBtn) {
+      trainBtn.addEventListener('click', function () {
+        runTraining();
       });
     }
 

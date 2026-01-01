@@ -28,6 +28,14 @@ if (!defined('ABSPATH')) {
         <button type="submit" class="simple-chatbot__button simple-chatbot__button--primary"><?php esc_html_e('Mentés', 'simple-chatbot'); ?></button>
     </div>
 </form>
+<div class="simple-chatbot__section">
+    <h3><?php esc_html_e('Betanítások', 'simple-chatbot'); ?></h3>
+    <p class="simple-chatbot__muted"><?php esc_html_e('Olvassa be a feltöltött tudásanyag TXT-ket és archív tartalmat, majd frissíti a chatbot gyorsítótárát.', 'simple-chatbot'); ?></p>
+    <div class="simple-chatbot__inline-actions">
+        <button type="button" class="simple-chatbot__button simple-chatbot__button--secondary js-simple-chatbot-train"><?php esc_html_e('Betanítás futtatása', 'simple-chatbot'); ?></button>
+        <span class="simple-chatbot__muted js-simple-chatbot-train-status" aria-live="polite"></span>
+    </div>
+</div>
 <div class="simple-chatbot__section simple-chatbot__embed-help">
     <h3><?php esc_html_e('Elhelyezési útmutató', 'simple-chatbot'); ?></h3>
     <p class="simple-chatbot__muted"><?php esc_html_e('Használd az alábbi kódot, ha a chatbotot minden oldaladon, például a láblécben szeretnéd megjeleníteni.', 'simple-chatbot'); ?></p>

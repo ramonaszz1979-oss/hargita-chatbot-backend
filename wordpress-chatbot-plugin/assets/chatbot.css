@@ -365,6 +365,13 @@
   margin: 0 0 8px;
 }
 
+.simple-chatbot__inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .simple-chatbot__dissertation {
   border: 1px solid #e5e7eb;
   border-radius: 12px;

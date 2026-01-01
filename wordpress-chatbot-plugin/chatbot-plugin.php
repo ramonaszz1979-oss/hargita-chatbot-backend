@@ -254,6 +254,12 @@ class SimpleChatbotPlugin
             ],
         ]);
 
+        register_rest_route('simple-chatbot/v1', '/train', [
+            'methods' => 'POST',
+            'callback' => [$this, 'train_knowledge'],
+            'permission_callback' => [$this, 'can_manage'],
+        ]);
+
         register_rest_route('simple-chatbot/v1', '/processes', [
             [
                 'methods' => 'GET',
@@ -941,6 +947,21 @@ class SimpleChatbotPlugin
         wp_delete_attachment($fileId, true);
 
         $this->redirect_with_notice(__('A fájl törölve.', 'simple-chatbot'));
+    }
+
+    public function train_knowledge()
+    {
+        $context = $this->get_knowledge_context();
+
+        $hasContent = strpos($context, __('Nincs felhasználható tudásanyag.', 'simple-chatbot')) === false;
+
+        return rest_ensure_response([
+            'success' => $hasContent,
+            'message' => $hasContent
+                ? __('Tudásbázis frissítve: a források beolvasva és gyorsítótárazva.', 'simple-chatbot')
+                : __('Nem található tudásanyag a megadott útvonalakon.', 'simple-chatbot'),
+            'preview' => $context,
+        ]);
     }
 
     public function handle_add_url()
